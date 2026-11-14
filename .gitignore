@@ -1,1 +1,7 @@
 .npm-cache/
+
+# Local credentials and environment configuration
+.secrets.txt
+.env
+.env.*
+!.env.example
