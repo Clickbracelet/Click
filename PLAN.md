@@ -90,4 +90,5 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Added preview-only mock location and time context rows to illustrate the complete Click profile format without collecting additional user input.
 - 2026-11-14 — Centered the preview-only context rows and updated their sample copy to “Location you clicked” and “11:11.”
 - 2026-11-14 — Centered each preview context row as a complete icon-and-text unit; updated the sample time to “November 13th, 5pm.”
+- 2026-11-14 — Replaced the social-account setup alert with a red inline helper message; refreshed the Expo wrapper so the phone app matches the current prototype.
 - 2026-11-14 — Refreshed the Expo wrapper’s bundled HTML from the current prototype so `Frontend.html` and the phone app stay aligned for collaborators.

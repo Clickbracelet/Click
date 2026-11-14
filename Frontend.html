@@ -196,11 +196,15 @@ document.addEventListener('DOMContentLoaded', async function() {
       )
       .replace(
         "socialsNext: set({ screen: s.fromSettings ? 'settings' : 'presetsSetup' }),",
-        "socialsNext: () => { if (!hasSocial) { alert('Add a handle or link for at least one social account to continue.'); return; } this.setState({ screen: this.state.fromSettings ? 'settings' : 'presetsSetup' }); },"
+        "socialsNext: () => { if (!hasSocial) { this.setState({ socialError: true }); return; } this.setState({ screen: this.state.fromSettings ? 'settings' : 'presetsSetup', socialError: false }); },"
       )
       .replace(
         'Turn on an account and add your handle. Presets decide which ones you share.',
         'Add at least one account and handle. Presets decide which ones you share.'
+      )
+      .replace(
+        '<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #7A5E66">Add at least one account and handle. Presets decide which ones you share.</p>\n</div>\n<p style="margin: 0; font-size: 14px; font-weight: 600">{{socialCount}}</p>',
+        '<p style="margin: 0; font-size: 16px; line-height: 1.5; color: #7A5E66">Add at least one account and handle. Presets decide which ones you share.</p>\n</div>\n<sc-if value="{{socialError}}" hint-placeholder-val="{{false}}"><p style="margin: 0; font-size: 13px; line-height: 1.4; color: #B84F65">* Add a handle or link for at least one social account to continue.</p></sc-if>\n<p style="margin: 0; font-size: 14px; font-weight: 600">{{socialCount}}</p>'
       )
       .replace(
         'style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C"',
@@ -222,6 +226,10 @@ document.addEventListener('DOMContentLoaded', async function() {
       .replace(
         "displayTags: tags.length ? tags.join(' · ') : 'Three things about you',",
         "displayTags: tags.length ? tags.join(' · ') : 'Surfer · Kappa Alpha Theta · Architecture major · Coffee lover', displayTagsStyle: 'font-size: 13px; line-height: 1.35; color: ' + (tags.length ? '#7A5E66' : '#B8AFA9'),"
+      )
+      .replace(
+        "socialCount: onCount === 0 ? 'No accounts added yet' : (onCount === 1 ? '1 account added' : onCount + ' accounts added'),",
+        "socialError: !!s.socialError && !hasSocial, socialCount: onCount === 0 ? 'No accounts added yet' : (onCount === 1 ? '1 account added' : onCount + ' accounts added'),"
       )
       .replace(
         'onProfName: (e) => this.setState({ profName: e.target.value }),',
