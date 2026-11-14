@@ -71,3 +71,4 @@ The prototype is a single-page mobile experience that demonstrates:
 Record meaningful product, design, architecture, and delivery decisions here. Add the date, a concise description, and any follow-up work.
 
 - 2026-11-13 — Created the initial product plan and roadmap.
+- 2026-11-13 — Added an Expo mobile wrapper that renders the existing HTML prototype in a WebView for iPhone testing. Native React Native screens can replace the embedded page incrementally.
