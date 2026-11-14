@@ -172,6 +172,29 @@ document.addEventListener('DOMContentLoaded', async function() {
       .replace('body{margin:0;background:#FAF7F2}', 'body{margin:0;background:#F5F0E8}')
       .replace('width: 390px; height: 844px; box-sizing: border-box; background: #FAF7F2;', 'width: 390px; height: 844px; box-sizing: border-box; background: #F5F0E8;');
 
+    // Keep the pitch flow honest: a Click profile needs a name, bio, and one usable social link.
+    template = template
+      .replace(
+        '<input type="text" value="{{tag3}}" sc-camel-on-change="{{onTag3}}" placeholder="e.g., Coffee snob" aria-label="Third thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">\n</div>',
+        '<input type="text" value="{{tag3}}" sc-camel-on-change="{{onTag3}}" placeholder="e.g., Coffee snob" aria-label="Third thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">\n</div>\n<label style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; font-weight: 500">Bio\n<textarea value="{{profBio}}" sc-camel-on-change="{{onProfBio}}" placeholder="A little about you" aria-label="Bio" style="min-height: 82px; resize: vertical; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 12px 14px; font-size: 16px; color: #4A1A2C"></textarea>\n</label>'
+      )
+      .replace(
+        "const onCount = PLATFORMS.filter((p) => s.on[p.id]).length + s.customLinks.length;",
+        "const onCount = PLATFORMS.filter((p) => s.on[p.id]).length + s.customLinks.length;\n    const hasSocial = PLATFORMS.some((p) => s.on[p.id] && (s.handles[p.id] || '').trim()) || s.customLinks.some((c) => c.name.trim() && c.handle.trim());"
+      )
+      .replace(
+        "profileNext: set({ screen: s.fromSettings ? 'settings' : 'socials' }),",
+        "profileNext: () => { if (!this.state.profName.trim() || !this.state.profBio.trim()) { alert('Add your name and a short bio to continue.'); return; } this.setState({ screen: this.state.fromSettings ? 'settings' : 'socials' }); },"
+      )
+      .replace(
+        "socialsNext: set({ screen: s.fromSettings ? 'settings' : 'presetsSetup' }),",
+        "socialsNext: () => { if (!hasSocial) { alert('Add a handle or link for at least one social account to continue.'); return; } this.setState({ screen: this.state.fromSettings ? 'settings' : 'presetsSetup' }); },"
+      )
+      .replace(
+        'Turn on an account and add your handle. Presets decide which ones you share.',
+        'Add at least one account and handle. Presets decide which ones you share.'
+      );
+
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
     // document's manifest; frame srcs carry an about:blank#<uuid> marker
     // instead of a substitutable uuid. Every document mints the blobs for
