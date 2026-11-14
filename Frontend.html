@@ -268,7 +268,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         'margin-top: 18px; display: flex; flex-direction: column; gap: 11px; align-self: center; text-align: center'
       )
       .replace('Everywhere at once', 'Location you clicked')
-      .replace('Founded 2026', '11:11');
+      .replace('Founded 2026', '11:11')
+      .replaceAll(
+        'display: flex; align-items: center; gap: 12px; color: #7A5E66; font-size: 14px',
+        'display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; color: #7A5E66; font-size: 14px'
+      )
+      .replace('11:11', 'November 13th, 5pm');
 
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
     // document's manifest; frame srcs carry an about:blank#<uuid> marker
