@@ -217,7 +217,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       .replace('e.g., Coffee snob', 'e.g., Architecture major')
       .replace(
         'const tags = [s.tag1, s.tag2, s.tag3].map((t) => t.trim()).filter(Boolean);',
-        "const tags = [s.tag1, s.tag2, s.tag3, s.tag4 || ''].map((t) => t.trim()).filter(Boolean);\n    const identityError = !!s.profileIdentityError && (!s.profName.trim() || tags.length === 0);"
+        "const tags = [s.tag1, s.tag2, s.tag3, s.tag4 || ''].map((t) => t.trim()).filter(Boolean);\n    const fieldError = !!s.profileIdentityError && tags.length === 0;\n    const identityError = !!s.profileIdentityError && (!s.profName.trim() || tags.length === 0);"
       )
       .replace(
         "displayTags: tags.length ? tags.join(' · ') : 'Three things about you',",
@@ -225,7 +225,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       )
       .replace(
         'onProfName: (e) => this.setState({ profName: e.target.value }),',
-        "hasBio: !!s.profBio.trim(), identityError: identityError, nameStyle: 'height: 48px; box-sizing: border-box; border: ' + (identityError ? '2px solid #C96578' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', onProfName: (e) => this.setState({ profName: e.target.value }),"
+        "hasBio: !!s.profBio.trim(), identityError: identityError, nameStyle: 'height: 48px; box-sizing: border-box; border: ' + (fieldError ? '2px solid #C96578' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', onProfName: (e) => this.setState({ profName: e.target.value }),"
       )
       .replace(
         '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Surfer" aria-label="Second thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">',
@@ -236,12 +236,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         '<input type="text" value="{{tag3}}" sc-camel-on-change="{{onTag3}}" placeholder="e.g., Coffee snob" aria-label="Third thing about you" style="{{tag3Style}}">'
       )
       .replace(
+        '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Kappa Alpha Theta" aria-label="Second thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">',
+        '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Kappa Alpha Theta" aria-label="Second thing about you" style="{{tag2Style}}">'
+      )
+      .replace(
+        '<input type="text" value="{{tag3}}" sc-camel-on-change="{{onTag3}}" placeholder="e.g., Architecture major" aria-label="Third thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">',
+        '<input type="text" value="{{tag3}}" sc-camel-on-change="{{onTag3}}" placeholder="e.g., Architecture major" aria-label="Third thing about you" style="{{tag3Style}}">'
+      )
+      .replace(
         'profName: s.profName, tag1: s.tag1, tag2: s.tag2, tag3: s.tag3, profBio: s.profBio,',
         "profName: s.profName, tag1: s.tag1, tag2: s.tag2, tag3: s.tag3, tag4: s.tag4 || '', profBio: s.profBio, onTag4: (e) => this.setState({ tag4: e.target.value }), tag1Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() && !(s.tag4 || '').trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag2Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() && !(s.tag4 || '').trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag3Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() && !(s.tag4 || '').trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag4Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() && !(s.tag4 || '').trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C',"
       )
       .replaceAll(
         "s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() && !(s.tag4 || '').trim()",
-        'identityError'
+        'fieldError'
+      )
+      .replaceAll(
+        "'2px solid #E8A7BC'",
+        "'2px solid #C96578'"
       )
       .replace(
         '<div style="display: flex; align-items: center; gap: 14px; padding: 14px; border: 1px solid #E7DFD6; border-radius: 20px; background: #FFFFFF; box-shadow: 0 6px 18px rgba(74,26,44,0.06)">\n<span style="width: 56px; height: 56px; flex: none; border-radius: 999px; background: #F5F0E8; overflow: hidden; display: flex; align-items: center; justify-content: center; font-family: \'Cormorant Garamond\', Georgia, serif; font-size: 24px; font-weight: 600">\n<sc-if value="{{hasPhoto}}" hint-placeholder-val="{{false}}"><img src="{{photo}}" alt="" style="width: 100%; height: 100%; object-fit: cover"></sc-if>\n<sc-if value="{{noPhoto}}" hint-placeholder-val="{{true}}">{{myInitial}}</sc-if>\n</span>\n<span style="flex: 1; display: flex; flex-direction: column; gap: 3px; min-width: 0">\n<span style="font-family: \'Cormorant Garamond\', Georgia, serif; font-size: 22px; font-weight: 600; line-height: 1.1">{{displayName}}</span>\n<span style="font-size: 13px; color: #7A5E66">{{displayTags}}</span>\n</span>\n</div>',
