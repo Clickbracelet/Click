@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       )
       .replace(
         "profileNext: set({ screen: s.fromSettings ? 'settings' : 'socials' }),",
-        "profileNext: () => { const st = this.state; const missingInterest = !st.tag1.trim() && !st.tag2.trim() && !st.tag3.trim() && !(st.tag4 || '').trim(); if (!st.profName.trim() || missingInterest) { this.setState({ profileIdentityError: true }); return; } if (!st.profBio.trim()) { this.setState({ profileTried: true }); return; } this.setState({ screen: st.fromSettings ? 'settings' : 'socials', profileTried: false, profileIdentityError: false }); },"
+        "profileNext: () => { const st = this.state; const missingInterest = !st.tag1.trim() && !st.tag2.trim() && !st.tag3.trim() && !(st.tag4 || '').trim(); if (!st.profName.trim() || missingInterest) { this.setState({ profileIdentityError: true }); return; } this.setState({ screen: st.fromSettings ? 'settings' : 'socials', profileTried: false, profileIdentityError: false }); },"
       )
       .replace(
         "socialsNext: set({ screen: s.fromSettings ? 'settings' : 'presetsSetup' }),",
