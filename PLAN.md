@@ -84,4 +84,5 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Restyled the profile preview as a tall, centered card inspired by the approved reference; bio text now appears live beneath the user’s interests once entered.
 - 2026-11-14 — Combined Name and Interests & Communities into a clear required identity section: if either is missing, the relevant fields turn red and explain the minimum needed to continue.
 - 2026-11-14 — Standardized all Name and Interest validation borders. Entering any interest clears the field highlights; the helper message remains until both the name and one interest are present.
+- 2026-11-14 — Refined validation feedback so entering a name also clears the red outlines immediately, while the helper message continues until both requirements are complete.
 - 2026-11-14 — Refreshed the Expo wrapper’s bundled HTML from the current prototype so `Frontend.html` and the phone app stay aligned for collaborators.
