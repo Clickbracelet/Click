@@ -83,3 +83,4 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Refined the profile preview with a circular photo treatment and camera placeholder; example interests use light gray and user-entered interests return to the standard brown text color.
 - 2026-11-14 — Restyled the profile preview as a tall, centered card inspired by the approved reference; bio text now appears live beneath the user’s interests once entered.
 - 2026-11-14 — Combined Name and Interests & Communities into a clear required identity section: if either is missing, the relevant fields turn red and explain the minimum needed to continue.
+- 2026-11-14 — Refreshed the Expo wrapper’s bundled HTML from the current prototype so `Frontend.html` and the phone app stay aligned for collaborators.
