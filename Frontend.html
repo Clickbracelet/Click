@@ -215,6 +215,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         "const tags = [s.tag1, s.tag2, s.tag3, s.tag4 || ''].map((t) => t.trim()).filter(Boolean);"
       )
       .replace(
+        "displayTags: tags.length ? tags.join(' · ') : 'Three things about you',",
+        "displayTags: tags.length ? tags.join(' · ') : 'Surfing · Kappa Alpha Theta · Architecture major · Coffee lover',"
+      )
+      .replace(
         '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Surfer" aria-label="Second thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">',
         '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Surfer" aria-label="Second thing about you" style="{{tag2Style}}">'
       )

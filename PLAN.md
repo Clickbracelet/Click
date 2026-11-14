@@ -79,3 +79,4 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Reframed profile descriptors as “Interests & Communities.” One entry is required; this accommodates hobbies, organizations, academic identity, and social groups without awkward adjective/noun phrasing. “Architecture major” is an example within this group, not a separate category.
 - 2026-11-14 — Redesigned the profile setup preview as a square, dating-app-inspired card with a large image area above stacked identity details.
 - 2026-11-14 — Expanded Interests & Communities to four optional entry boxes while retaining the one-entry minimum; restored “Coffee lover” as an example.
+- 2026-11-14 — Updated the preview’s empty state to show example interest groups, then replace them with the user’s actual entries as soon as they type.
