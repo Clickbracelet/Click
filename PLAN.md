@@ -80,3 +80,4 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Redesigned the profile setup preview as a square, dating-app-inspired card with a large image area above stacked identity details.
 - 2026-11-14 — Expanded Interests & Communities to four optional entry boxes while retaining the one-entry minimum; restored “Coffee lover” as an example.
 - 2026-11-14 — Updated the preview’s empty state to show example interest groups, then replace them with the user’s actual entries as soon as they type.
+- 2026-11-14 — Refined the profile preview with a circular photo treatment and camera placeholder; example interests use light gray and user-entered interests return to the standard brown text color.
