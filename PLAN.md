@@ -76,5 +76,4 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Made onboarding profile requirements explicit: users must provide a name, a short bio, and at least one usable social handle or link before completing setup.
 - 2026-11-14 — Updated the successful pairing indicator: only its outer ring pulses pink with a purple glow; the cream center and gold check remain unchanged.
 - 2026-11-14 — Made all three profile descriptor lines required during setup and added a light-pink outline to any line left blank after the user tries to continue.
-- 2026-11-14 — Reframed profile descriptors as “Interests & communities.” One entry is required; this accommodates hobbies, organizations, identities, and social groups without awkward adjective/noun phrasing.
-- 2026-11-14 — Added an optional Major field to profile setup, placed after Interests & Communities to capture academic identity without making it a requirement.
+- 2026-11-14 — Reframed profile descriptors as “Interests & Communities.” One entry is required; this accommodates hobbies, organizations, academic identity, and social groups without awkward adjective/noun phrasing. “Architecture major” is an example within this group, not a separate category.
