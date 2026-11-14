@@ -170,7 +170,15 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Use Click's neutral warm-cream background instead of the prior pink-leaning canvas.
     template = template
       .replace('body{margin:0;background:#FAF7F2}', 'body{margin:0;background:#F5F0E8}')
-      .replace('width: 390px; height: 844px; box-sizing: border-box; background: #FAF7F2;', 'width: 390px; height: 844px; box-sizing: border-box; background: #F5F0E8;');
+      .replace('width: 390px; height: 844px; box-sizing: border-box; background: #FAF7F2;', 'width: 390px; height: 844px; box-sizing: border-box; background: #F5F0E8;')
+      .replace(
+        'body{margin:0;background:#F5F0E8}',
+        'body{margin:0;background:#F5F0E8}@keyframes click-paired-ring{0%,100%{box-shadow:0 0 0 10px rgba(231,157,204,.62),0 0 18px rgba(155,108,201,.40)}50%{box-shadow:0 0 0 14px rgba(231,157,204,.40),0 0 42px rgba(155,108,201,.58)}}'
+      )
+      .replace(
+        "pairCircleStyle: 'width: 180px; height: 180px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #F5F0E8; transition: box-shadow 0.4s; box-shadow: ' + (pairState === 'searching' ? '0 0 0 14px rgba(201,161,74,0.18), 0 0 0 30px rgba(201,161,74,0.08)' : (pairState === 'paired' ? '0 0 0 10px rgba(201,161,74,0.22)' : 'none')),",
+        "pairCircleStyle: 'width: 180px; height: 180px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #F5F0E8; transition: box-shadow 0.4s; animation: ' + (pairState === 'paired' ? 'click-paired-ring 1.65s ease-in-out infinite' : 'none') + '; box-shadow: ' + (pairState === 'searching' ? '0 0 0 14px rgba(201,161,74,0.18), 0 0 0 30px rgba(201,161,74,0.08)' : (pairState === 'paired' ? '0 0 0 10px rgba(231,157,204,.62), 0 0 18px rgba(155,108,201,.40)' : 'none')),"
+      );
 
     // Keep the pitch flow honest: a Click profile needs a name, bio, and one usable social link.
     template = template
