@@ -288,6 +288,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       )
       .replace('list="{{platRows}}"', 'list="{{visiblePlatRows}}"')
       .replace(
+        '</sc-for>\n<sc-for list="{{customRows}}"',
         '</sc-for>\n<sc-if value="{{morePlatformsHidden}}" hint-placeholder-val="{{true}}"><button type="button" sc-camel-on-click="{{showMorePlatforms}}" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 1px dashed #C9A14A; border-radius: 18px; background: transparent; cursor: pointer; color: #4A1A2C; font-size: 15px; font-weight: 600"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="#4A1A2C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Show more platforms</button></sc-if>\n<sc-if value="{{morePlatformsShown}}" hint-placeholder-val="{{false}}"><button type="button" sc-camel-on-click="{{showLessPlatforms}}" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; border: 1px dashed #C9A14A; border-radius: 18px; background: transparent; cursor: pointer; color: #4A1A2C; font-size: 15px; font-weight: 600"><svg width="18" height="18" sc-camel-view-box="0 0 24 24" fill="none" stroke="#4A1A2C" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg>Show less platforms</button></sc-if>\n<sc-for list="{{customRows}}"'
       )
       .replace(
