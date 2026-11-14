@@ -72,3 +72,4 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 
 - 2026-11-13 — Created the initial product plan and roadmap.
 - 2026-11-13 — Added an Expo mobile wrapper that renders the existing HTML prototype in a WebView for iPhone testing. Native React Native screens can replace the embedded page incrementally.
+- 2026-11-14 — Updated the prototype canvas and browser background to Click’s warm cream (`#F5F0E8`), replacing the previous pink-leaning background while retaining rose gold as an accent.
