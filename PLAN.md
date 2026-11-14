@@ -75,3 +75,4 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Updated the prototype canvas and browser background to Click’s warm cream (`#F5F0E8`), replacing the previous pink-leaning background while retaining rose gold as an accent.
 - 2026-11-14 — Made onboarding profile requirements explicit: users must provide a name, a short bio, and at least one usable social handle or link before completing setup.
 - 2026-11-14 — Updated the successful pairing indicator: only its outer ring pulses pink with a purple glow; the cream center and gold check remain unchanged.
+- 2026-11-14 — Made all three profile descriptor lines required during setup and added a light-pink outline to any line left blank after the user tries to continue.

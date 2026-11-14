@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       )
       .replace(
         "profileNext: set({ screen: s.fromSettings ? 'settings' : 'socials' }),",
-        "profileNext: () => { if (!this.state.profName.trim() || !this.state.profBio.trim()) { alert('Add your name and a short bio to continue.'); return; } this.setState({ screen: this.state.fromSettings ? 'settings' : 'socials' }); },"
+        "profileNext: () => { const st = this.state; const missingLines = !st.tag1.trim() || !st.tag2.trim() || !st.tag3.trim(); if (!st.profName.trim() || !st.profBio.trim()) { this.setState({ profileTried: true }); alert('Add your name and a short bio to continue.'); return; } if (missingLines) { this.setState({ profileTried: true }); return; } this.setState({ screen: st.fromSettings ? 'settings' : 'socials', profileTried: false }); },"
       )
       .replace(
         "socialsNext: set({ screen: s.fromSettings ? 'settings' : 'presetsSetup' }),",
@@ -201,6 +201,22 @@ document.addEventListener('DOMContentLoaded', async function() {
       .replace(
         'Turn on an account and add your handle. Presets decide which ones you share.',
         'Add at least one account and handle. Presets decide which ones you share.'
+      )
+      .replace(
+        'style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C"',
+        'style="{{tag1Style}}"'
+      )
+      .replace(
+        '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Surfer" aria-label="Second thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">',
+        '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Surfer" aria-label="Second thing about you" style="{{tag2Style}}">'
+      )
+      .replace(
+        '<input type="text" value="{{tag3}}" sc-camel-on-change="{{onTag3}}" placeholder="e.g., Coffee snob" aria-label="Third thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">',
+        '<input type="text" value="{{tag3}}" sc-camel-on-change="{{onTag3}}" placeholder="e.g., Coffee snob" aria-label="Third thing about you" style="{{tag3Style}}">'
+      )
+      .replace(
+        'profName: s.profName, tag1: s.tag1, tag2: s.tag2, tag3: s.tag3, profBio: s.profBio,',
+        "profName: s.profName, tag1: s.tag1, tag2: s.tag2, tag3: s.tag3, profBio: s.profBio, tag1Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag2Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag2.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag3Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag3.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C',"
       );
 
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
