@@ -192,7 +192,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       )
       .replace(
         "profileNext: set({ screen: s.fromSettings ? 'settings' : 'socials' }),",
-        "profileNext: () => { const st = this.state; const missingLines = !st.tag1.trim() || !st.tag2.trim() || !st.tag3.trim(); if (!st.profName.trim() || !st.profBio.trim()) { this.setState({ profileTried: true }); alert('Add your name and a short bio to continue.'); return; } if (missingLines) { this.setState({ profileTried: true }); return; } this.setState({ screen: st.fromSettings ? 'settings' : 'socials', profileTried: false }); },"
+        "profileNext: () => { const st = this.state; const missingInterest = !st.tag1.trim() && !st.tag2.trim() && !st.tag3.trim(); if (!st.profName.trim() || !st.profBio.trim()) { this.setState({ profileTried: true }); return; } if (missingInterest) { this.setState({ profileTried: true }); alert('Add at least one interest group before moving on.'); return; } this.setState({ screen: st.fromSettings ? 'settings' : 'socials', profileTried: false }); },"
       )
       .replace(
         "socialsNext: set({ screen: s.fromSettings ? 'settings' : 'presetsSetup' }),",
@@ -206,6 +206,10 @@ document.addEventListener('DOMContentLoaded', async function() {
         'style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C"',
         'style="{{tag1Style}}"'
       )
+      .replace('Three lines about you', 'Interests & communities')
+      .replace('e.g., Film student', 'e.g., Surfing')
+      .replace('e.g., Surfer', 'e.g., Kappa Alpha Theta')
+      .replace('e.g., Coffee snob', 'e.g., Coffee lover')
       .replace(
         '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Surfer" aria-label="Second thing about you" style="height: 46px; box-sizing: border-box; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C">',
         '<input type="text" value="{{tag2}}" sc-camel-on-change="{{onTag2}}" placeholder="e.g., Surfer" aria-label="Second thing about you" style="{{tag2Style}}">'
@@ -216,7 +220,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       )
       .replace(
         'profName: s.profName, tag1: s.tag1, tag2: s.tag2, tag3: s.tag3, profBio: s.profBio,',
-        "profName: s.profName, tag1: s.tag1, tag2: s.tag2, tag3: s.tag3, profBio: s.profBio, tag1Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag2Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag2.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag3Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag3.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C',"
+        "profName: s.profName, tag1: s.tag1, tag2: s.tag2, tag3: s.tag3, profBio: s.profBio, tag1Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag2Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C', tag3Style: 'height: 46px; box-sizing: border-box; border: ' + (s.profileTried && !s.tag1.trim() && !s.tag2.trim() && !s.tag3.trim() ? '2px solid #E8A7BC' : '1px solid #E7DFD6') + '; border-radius: 14px; background: #FFFFFF; padding: 0 14px; font-size: 16px; color: #4A1A2C',"
       );
 
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
