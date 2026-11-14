@@ -262,7 +262,13 @@ document.addEventListener('DOMContentLoaded', async function() {
       .replace(
         '<sc-if value="{{hasBio}}" hint-placeholder-val="{{false}}"><p style="max-width: 255px; margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: #7A5E66">{{profBio}}</p></sc-if>\n</div>\n</div>\n</div>',
         '<sc-if value="{{hasBio}}" hint-placeholder-val="{{false}}"><p style="max-width: 255px; margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: #7A5E66">{{profBio}}</p></sc-if>\n<div style="margin-top: 18px; display: flex; flex-direction: column; gap: 11px; align-self: flex-start; text-align: left">\n<div style="display: flex; align-items: center; gap: 12px; color: #7A5E66; font-size: 14px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#7A5E66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0z"></path><circle cx="12" cy="10" r="3"></circle></svg><span>Everywhere at once</span></div>\n<div style="display: flex; align-items: center; gap: 12px; color: #7A5E66; font-size: 14px"><svg width="20" height="20" sc-camel-view-box="0 0 24 24" fill="none" stroke="#7A5E66" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg><span>Founded 2026</span></div>\n</div>\n</div>\n</div>\n</div>'
-      );
+      )
+      .replace(
+        'margin-top: 18px; display: flex; flex-direction: column; gap: 11px; align-self: flex-start; text-align: left',
+        'margin-top: 18px; display: flex; flex-direction: column; gap: 11px; align-self: center; text-align: center'
+      )
+      .replace('Everywhere at once', 'Location you clicked')
+      .replace('Founded 2026', '11:11');
 
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
     // document's manifest; frame srcs carry an about:blank#<uuid> marker
