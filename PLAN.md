@@ -93,4 +93,5 @@ Record meaningful product, design, architecture, and delivery decisions here. Ad
 - 2026-11-14 — Replaced the social-account setup alert with a red inline helper message; refreshed the Expo wrapper so the phone app matches the current prototype.
 - 2026-11-14 — Simplified social setup: the top seven platforms appear first, remaining built-ins use a “Show more platforms” control, and additional services must be selected from a real-app/website picker. Custom websites require a valid web address.
 - 2026-11-14 — Added a matching “Show less platforms” control so users can collapse the expanded social-platform list back to the top seven.
+- 2026-11-14 — Restored the collapsed-view “Show more platforms” control alongside its expanded-view “Show less platforms” companion.
 - 2026-11-14 — Refreshed the Expo wrapper’s bundled HTML from the current prototype so `Frontend.html` and the phone app stay aligned for collaborators.
