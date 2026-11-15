@@ -27,6 +27,7 @@ export default function App() {
       try {
         const { data: current } = await supabase.auth.getSession();
         if (current.session) {
+          if (__DEV__) console.log(`Google sign-in skipped: already signed in as ${current.session.user.email}. Sign out in Settings to see the Google page again.`);
           continueAfterSignIn();
           return;
         }
