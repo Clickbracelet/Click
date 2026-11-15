@@ -5,6 +5,7 @@
     "scheme": "clickbracelet",
     "version": "1.0.0",
     "orientation": "portrait",
+    "backgroundColor": "#FAF7F2",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
@@ -14,7 +15,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#FAF7F2"
       },
       "predictiveBackGestureEnabled": false
     },
@@ -29,7 +30,7 @@
         {
           "image": "./assets/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#FDE7F0"
+          "backgroundColor": "#FAF7F2"
         }
       ]
     ]

@@ -78,6 +78,7 @@ type PageMessage =
   | { type: 'save-profile'; profile: ProfileMessage }
   | { type: 'update-clicks'; changes: ClickChange[] }
   | { type: 'add-share-answer'; add: boolean }
+  | { type: 'open-url'; url: string }
   | AskMessage;
 
 // The page can't load a QR library from the internet, so the app draws the code.
@@ -105,10 +106,10 @@ export default function App() {
     page.current?.injectJavaScript(`window.__clickApp && window.__clickApp.setState(${JSON.stringify(patch)}); true;`);
   };
 
-  const loadProfile = async (userId: string) => {
+  const loadProfile = async (userId: string): Promise<boolean> => {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     if (error) throw error;
-    if (!data) return;
+    if (!data) return false;
     const socials: Record<string, string> = data.socials ?? {};
     const [tag1 = '', tag2 = '', tag3 = '', tag4 = ''] = data.interests ?? [];
     setPageState({
@@ -120,6 +121,7 @@ export default function App() {
       handles: socials,
       customLinks: data.custom_links ?? [],
     });
+    return true;
   };
 
   const saveProfile = async (profile: ProfileMessage) => {
@@ -196,18 +198,27 @@ export default function App() {
 
   const continueAfterSignIn = async (userId: string) => {
     let loaded = false;
+    let hasRegisteredProfile = false;
     try {
-      await Promise.all([loadProfile(userId), loadClicks()]);
+      const [profileExists] = await Promise.all([loadProfile(userId), loadClicks()]);
+      hasRegisteredProfile = profileExists;
       loaded = true;
     } catch (error) {
       showAlert('Could not load your Click data', error instanceof Error ? error.message : 'Please try again.');
     }
-    page.current?.injectJavaScript(`
-      window.__clickGoogleAuthed = true;
-      Array.from(document.querySelectorAll('button'))
-        .find((button) => button.textContent?.includes('Continue with Google'))?.click();
-      true;
-    `);
+    if (hasRegisteredProfile) {
+      // Returning users have already completed setup, so take them straight to
+      // their Clicks rather than replaying bracelet, profile, and preset steps.
+      page.current?.injectJavaScript('window.__clickGoogleAuthed = true; true;');
+      setPageState({ screen: 'clicks', fromSettings: false });
+    } else {
+      page.current?.injectJavaScript(`
+        window.__clickGoogleAuthed = true;
+        Array.from(document.querySelectorAll('button'))
+          .find((button) => button.textContent?.includes('Continue with Google'))?.click();
+        true;
+      `);
+    }
     if (loaded) {
       loadedUserId.current = userId;
       await openPendingLink();
@@ -379,6 +390,10 @@ export default function App() {
         pendingAddAnswer.current = null;
       } else if (parsed.type === 'ask') {
         await askClicks(parsed);
+      } else if (parsed.type === 'open-url') {
+        const url = new URL(parsed.url);
+        if (url.protocol !== 'https:') return;
+        await Linking.openURL(url.toString());
       }
     } else if (message === 'google-sign-in') {
       try {
@@ -472,6 +487,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FDE7F0',
+    backgroundColor: '#FAF7F2',
   },
 });
