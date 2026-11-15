@@ -890,7 +890,7 @@ let CLICK_DATA = [`
     // Signing out must not leave the previous account's profile in the form.
     patchOnce(
       "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', filter: 'year',",
-      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, shareOpen: false, shareLink: '', shareQr: '', addPreview: null, filter: 'year',"
+      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, shareOpen: false, shareLink: '', shareQr: '', shareTagLink: '', addPreview: null, filter: 'year',"
     );
     patchOnce(
       'style="align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; color: #7A5E66; font-size: 14px; text-decoration: underline">Sign out (restart demo)</button>',
@@ -904,7 +904,7 @@ let CLICK_DATA = [`
       "      editSocials: set({ screen: 'socials', fromSettings: true }),",
       `      editSocials: set({ screen: 'socials', fromSettings: true }),
       openShare: () => { this.setState({ shareOpen: true }); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('get-share-link'); },
-      shareOpen: !!s.shareOpen, shareLink: s.shareLink || '', shareQr: s.shareQr || '', shareReady: !!s.shareLink, shareLoading: !s.shareLink,
+      shareOpen: !!s.shareOpen, shareLink: s.shareLink || '', shareQr: s.shareQr || '', shareTagLink: s.shareTagLink || '', hasShareTagLink: !!s.shareTagLink, shareReady: !!s.shareLink, shareLoading: !s.shareLink,
       shareSend: () => { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('share-profile'); },
       shareReset: () => { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('reset-share-link'); },
       shareClose: set({ shareOpen: false }),
@@ -931,6 +931,11 @@ let CLICK_DATA = [`
 <sc-if value="{{shareReady}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 14px">
 <img src="{{shareQr}}" alt="QR code for your share link" style="align-self: center; width: 200px; height: 200px; box-sizing: border-box; padding: 10px; border: 1px solid #E7DFD6; border-radius: 20px; background: #FFFFFF">
 <p style="margin: 0; padding: 12px 14px; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; font-size: 13px; line-height: 1.4; color: #4A1A2C; word-break: break-all; font-variant-ligatures: none; user-select: all; -webkit-user-select: all">{{shareLink}}</p>
+<sc-if value="{{hasShareTagLink}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 6px">
+<p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #7A5E66">For NFC tags</p>
+<p style="margin: 0; padding: 12px 14px; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; font-size: 13px; line-height: 1.4; color: #4A1A2C; word-break: break-all; font-variant-ligatures: none; user-select: all; -webkit-user-select: all">{{shareTagLink}}</p>
+<p style="margin: 0; font-size: 13px; line-height: 1.45; color: #7A5E66">Write this to a tag as a URL record. Tapping the tag opens the Click app straight to adding you.</p>
+</div></sc-if>
 <button type="button" sc-camel-on-click="{{shareSend}}" style="height: 54px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(201,161,74,0.28)">Share link</button>
 <button type="button" sc-camel-on-click="{{shareClose}}" style="height: 54px; border: 1px solid #E7DFD6; border-radius: 999px; background: #FFFFFF; color: #4A1A2C; font-size: 16px; font-weight: 500; cursor: pointer">Done</button>
 <button type="button" sc-camel-on-click="{{shareReset}}" style="align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; color: #7A5E66; font-size: 14px; text-decoration: underline">Reset link</button>

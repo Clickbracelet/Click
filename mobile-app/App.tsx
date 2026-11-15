@@ -6,6 +6,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import qrcode from 'qrcode-generator';
 import { ClickPage, type ClickPageHandle } from './src/ClickPage';
+import { OpenInAppBar } from './src/OpenInAppBar';
 import { supabase } from './src/supabase';
 
 // On web this closes the Google sign-in popup and hands its result to the app.
@@ -80,6 +81,16 @@ type PageMessage =
   | { type: 'add-share-answer'; add: boolean }
   | { type: 'open-url'; url: string }
   | AskMessage;
+
+// Share links open the website, which works for anyone. On an iPhone with the app
+// installed, the website's Open in app bar hands the link to the app.
+const SHARE_SITE = 'https://click-bracelet.vercel.app';
+const shareLinks = (code: string) => ({
+  // The web build shares its own address, so local previews link to themselves.
+  url: Platform.OS === 'web' ? Linking.createURL(`add/${code}`) : `${SHARE_SITE}/add/${code}`,
+  // For NFC tags: opens the installed app directly (exp://… in Expo Go).
+  tagUrl: Platform.OS === 'web' ? `clickbracelet://add/${code}` : Linking.createURL(`add/${code}`),
+});
 
 // The page can't load a QR library from the internet, so the app draws the code.
 const qrDataUrl = (text: string) => {
@@ -157,8 +168,9 @@ export default function App() {
   };
 
   const loadClicks = async () => {
-    // Until the bracelet exists, dev builds give each account the prototype's demo clicks.
-    if (__DEV__) {
+    // Until the bracelet exists, new accounts get the prototype's demo clicks in dev
+    // and in phone builds (IOSPLAN.md), but not on the public website.
+    if (__DEV__ || Platform.OS !== 'web') {
       const { error: seedError } = await supabase.rpc('seed_demo_clicks');
       if (seedError) throw seedError;
     }
@@ -225,15 +237,16 @@ export default function App() {
     }
   };
 
-  // The link that adds the signed-in user as a click on someone else's phone.
-  const getShareLink = async () => {
+  // The signed-in user's links that add them as a click on someone else's phone.
+  const getShareLinks = async () => {
     const { data: code, error } = await supabase.rpc('get_my_share_code');
     if (error) throw error;
-    return Linking.createURL(`add/${code}`);
+    return shareLinks(code as string);
   };
 
-  // Fills the page's Share sheet with the link and its QR code.
-  const showShareLink = (url: string) => setPageState({ shareLink: url, shareQr: qrDataUrl(url) });
+  // Fills the page's Share sheet with the links and a QR code of the web link.
+  const showShareLinks = ({ url, tagUrl }: ReturnType<typeof shareLinks>) =>
+    setPageState({ shareLink: url, shareQr: qrDataUrl(url), shareTagLink: tagUrl });
 
   const resetShareLink = async () => {
     const reset = await confirmAction(
@@ -244,7 +257,7 @@ export default function App() {
     if (!reset) return;
     const { data: code, error } = await supabase.rpc('reset_share_code');
     if (error) throw error;
-    showShareLink(Linking.createURL(`add/${code}`));
+    showShareLinks(shareLinks(code as string));
   };
 
   // Shows the page's "Add this person?" card and waits for the answer.
@@ -256,7 +269,7 @@ export default function App() {
     });
 
   const shareProfile = async () => {
-    const url = await getShareLink();
+    const { url } = await getShareLinks();
     const message = `Add me on Click: ${url}`;
     if (Platform.OS !== 'web') {
       await Share.share({ message });
@@ -449,7 +462,7 @@ export default function App() {
       await openPendingLink();
     } else if (message === 'get-share-link') {
       try {
-        showShareLink(await getShareLink());
+        showShareLinks(await getShareLinks());
       } catch (error) {
         setPageState({ shareOpen: false });
         showAlert('Could not get your share link', error instanceof Error ? error.message : 'Please try again.');
@@ -479,6 +492,7 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
+      <OpenInAppBar />
       <ClickPage ref={page} html={html} onMessage={(message) => void handleMessage(message)} />
     </SafeAreaView>
   );
