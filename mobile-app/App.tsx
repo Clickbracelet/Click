@@ -1,15 +1,22 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { Alert, SafeAreaView, StyleSheet } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { Alert, Platform, SafeAreaView, StyleSheet } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import { ClickPage, type ClickPageHandle } from './src/ClickPage';
 import { supabase } from './src/supabase';
 
+// On web this closes the Google sign-in popup and hands its result to the app.
 WebBrowser.maybeCompleteAuthSession();
 
 const html: string = require('./html.json');
+
+// Alert.alert does nothing in the browser, so the web build uses window.alert.
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`);
+  else Alert.alert(title, message);
+};
 
 // Sent by Frontend.html after the profile or socials screen.
 type ProfileMessage = {
@@ -51,15 +58,17 @@ type PageMessage =
   | AskMessage;
 
 export default function App() {
-  const webView = useRef<WebView<{}>>(null);
+  const page = useRef<ClickPageHandle>(null);
   const pageReady = useRef(false);
+  // Web only: a sign-in finished by redirecting this tab, waiting for the page to load.
+  const pendingSignInUserId = useRef<string | null>(null);
   // Set once the signed-in user's profile and clicks are loaded into the page.
   const loadedUserId = useRef<string | null>(null);
   const loadedClickIds = useRef(new Set<string>());
   const pendingClickId = useRef<string | null>(null);
 
   const setPageState = (patch: Record<string, unknown>) => {
-    webView.current?.injectJavaScript(`window.__clickApp && window.__clickApp.setState(${JSON.stringify(patch)}); true;`);
+    page.current?.injectJavaScript(`window.__clickApp && window.__clickApp.setState(${JSON.stringify(patch)}); true;`);
   };
 
   const loadProfile = async (userId: string) => {
@@ -124,7 +133,7 @@ export default function App() {
       .order('clicked_at', { ascending: false });
     if (error) throw error;
     loadedClickIds.current = new Set(data.map((row) => row.id));
-    webView.current?.injectJavaScript(`window.__clickSetClicks && window.__clickSetClicks(${JSON.stringify(data)}); true;`);
+    page.current?.injectJavaScript(`window.__clickSetClicks && window.__clickSetClicks(${JSON.stringify(data)}); true;`);
   };
 
   const updateClicks = async (changes: ClickChange[]) => {
@@ -146,7 +155,7 @@ export default function App() {
       console.warn('Ask AI failed, using keyword search instead:', detail?.error ?? error.message);
     }
     const answer = error ? null : data;
-    webView.current?.injectJavaScript(
+    page.current?.injectJavaScript(
       `window.__clickAnswer && window.__clickAnswer(${JSON.stringify(id)}, ${JSON.stringify(answer)}); true;`,
     );
   };
@@ -157,9 +166,9 @@ export default function App() {
       await Promise.all([loadProfile(userId), loadClicks()]);
       loaded = true;
     } catch (error) {
-      Alert.alert('Could not load your Click data', error instanceof Error ? error.message : 'Please try again.');
+      showAlert('Could not load your Click data', error instanceof Error ? error.message : 'Please try again.');
     }
-    webView.current?.injectJavaScript(`
+    page.current?.injectJavaScript(`
       window.__clickGoogleAuthed = true;
       Array.from(document.querySelectorAll('button'))
         .find((button) => button.textContent?.includes('Continue with Google'))?.click();
@@ -184,11 +193,41 @@ export default function App() {
     }
     pendingClickId.current = null;
     if (!loadedClickIds.current.has(id)) {
-      Alert.alert('Click not found', "That click isn't in this account.");
+      showAlert('Click not found', "That click isn't in this account.");
       return;
     }
-    webView.current?.injectJavaScript(`window.__clickOpenClick && window.__clickOpenClick(${JSON.stringify(id)}); true;`);
+    page.current?.injectJavaScript(`window.__clickOpenClick && window.__clickOpenClick(${JSON.stringify(id)}); true;`);
   };
+
+  const openPendingSignIn = async () => {
+    const userId = pendingSignInUserId.current;
+    if (!userId || !pageReady.current) return;
+    pendingSignInUserId.current = null;
+    await continueAfterSignIn(userId);
+  };
+
+  // Web only: when the sign-in popup was blocked, Google sends this tab back to
+  // /auth/callback. Finish signing in, then continue once the page has loaded.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || window.opener) return;
+    const callback = new URL(window.location.href);
+    if (!callback.pathname.endsWith('/auth/callback')) return;
+    window.history.replaceState(null, '', '/');
+    const authError = callback.searchParams.get('error_description');
+    const code = callback.searchParams.get('code');
+    if (authError || !code) {
+      showAlert('Google sign-in failed', authError ?? 'The Google callback did not include an authorization code.');
+      return;
+    }
+    void supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
+      if (error) {
+        showAlert('Google sign-in failed', error.message);
+        return;
+      }
+      pendingSignInUserId.current = data.user.id;
+      void openPendingSignIn();
+    });
+  }, []);
 
   // Listens to every incoming link, so tapping the same tag twice opens it again.
   useEffect(() => {
@@ -210,13 +249,13 @@ export default function App() {
         try {
           await saveProfile(parsed.profile);
         } catch (error) {
-          Alert.alert('Could not save your profile', error instanceof Error ? error.message : 'Please try again.');
+          showAlert('Could not save your profile', error instanceof Error ? error.message : 'Please try again.');
         }
       } else if (parsed.type === 'update-clicks') {
         try {
           await updateClicks(parsed.changes);
         } catch (error) {
-          Alert.alert('Could not save your click changes', error instanceof Error ? error.message : 'Please try again.');
+          showAlert('Could not save your click changes', error instanceof Error ? error.message : 'Please try again.');
         }
       } else if (parsed.type === 'ask') {
         await askClicks(parsed);
@@ -242,7 +281,19 @@ export default function App() {
         if (error) throw error;
         if (!data.url) throw new Error('Supabase did not return a Google sign-in URL.');
 
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        let result: Awaited<ReturnType<typeof WebBrowser.openAuthSessionAsync>>;
+        try {
+          // On web this opens Google in a popup window.
+          result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        } catch (error) {
+          // A browser can block the popup. Sign in in this tab instead; finishWebRedirectSignIn
+          // picks up the result when Google sends the browser back.
+          if (Platform.OS === 'web' && (error as { code?: string }).code === 'ERR_WEB_BROWSER_BLOCKED') {
+            window.location.assign(data.url);
+            return;
+          }
+          throw error;
+        }
         if (result.type !== 'success' || !result.url) return;
 
         const callback = new URL(result.url);
@@ -255,29 +306,24 @@ export default function App() {
         if (exchangeError) throw exchangeError;
         await continueAfterSignIn(signedIn.user.id);
       } catch (error) {
-        Alert.alert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.');
+        showAlert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.');
       }
     } else if (message === 'page-ready') {
       pageReady.current = true;
+      await openPendingSignIn();
       await openPendingClick();
     } else if (message === 'sign-out') {
       loadedUserId.current = null;
       loadedClickIds.current = new Set();
       const { error } = await supabase.auth.signOut();
-      if (error) Alert.alert('Sign-out failed', error.message);
+      if (error) showAlert('Sign-out failed', error.message);
     }
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <WebView<{}>
-        ref={webView}
-        style={styles.webview}
-        originWhitelist={['*']}
-        source={{ html }}
-        onMessage={(event) => void handleMessage(event.nativeEvent.data)}
-      />
+      <ClickPage ref={page} html={html} onMessage={(message) => void handleMessage(message)} />
     </SafeAreaView>
   );
 }
@@ -286,8 +332,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FDE7F0',
-  },
-  webview: {
-    flex: 1,
   },
 });

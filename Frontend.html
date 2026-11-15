@@ -513,6 +513,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       `componentDidMount() {
     window.__clickApp = this;
     this.lastScreen = this.state.screen;
+    this.scrolledScreen = this.state.screen;
     // Swaps the demo clicks for the signed-in user's clicks from Supabase.
     window.__clickSetClicks = (rows) => {
       CLICK_DATA = rows.map(clickFromRow);
@@ -564,6 +565,20 @@ document.addEventListener('DOMContentLoaded', async function() {
       clearTimeout(this.clickSyncTimer);
       this.clickSyncTimer = setTimeout(() => this.syncClicks(), 800);
     }
+    // Every screen shares one scrolling pane, so a new screen would otherwise open
+    // wherever the last one was scrolled. Start at the top, or at the card the Ask
+    // chat asked to open.
+    if (st.screen !== this.scrolledScreen || this.scrollToExpandedClick) {
+      const toCard = this.scrollToExpandedClick;
+      this.scrolledScreen = st.screen;
+      this.scrollToExpandedClick = false;
+      requestAnimationFrame(() => {
+        const card = toCard && document.querySelector('[data-expanded-click]');
+        const pane = document.querySelector('[data-click-scroll]');
+        if (card) card.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        else if (pane) pane.scrollTop = 0;
+      });
+    }
     const prev = this.lastScreen;
     this.lastScreen = st.screen;
     if (prev === st.screen || (prev !== 'profile' && prev !== 'socials') || !window.ReactNativeWebView) return;
@@ -614,6 +629,19 @@ let CLICK_DATA = [`
     );
     patchOnce("'Who has red hair?', ", "'Who did I meet at the AI Hackathon?', ");
     patchOnce('I can find people by age, hair color in their photo, where or when you met', 'I can find people by age, where or when you met');
+    // Markers for the scroll handling in componentDidUpdate.
+    patchOnce(
+      '<div style="flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column">',
+      '<div data-click-scroll="" style="flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column">'
+    );
+    patchOnce(
+      '<sc-if value="{{c.expanded}}" hint-placeholder-val="{{false}}">\n<div style="position: relative; display: flex;',
+      '<sc-if value="{{c.expanded}}" hint-placeholder-val="{{false}}">\n<div data-expanded-click="" style="scroll-margin-top: 16px; position: relative; display: flex;'
+    );
+    patchOnce(
+      "open: () => this.setState({ screen: 'clicks', filter: 'year', expandedId: p.id, noteOpenId: null, editingLoc: false })",
+      "open: () => { this.scrollToExpandedClick = true; this.setState({ screen: 'clicks', filter: 'year', expandedId: p.id, noteOpenId: null, editingLoc: false }); }"
+    );
     // Ask AI: once signed in with real clicks, questions go to the app, which asks
     // the ask-clicks function. The keyword search stays as the offline fallback.
     patchOnce(

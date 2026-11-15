@@ -3,6 +3,8 @@
 // limit it to their clicks. Never use the service role key here.
 import Anthropic from 'npm:@anthropic-ai/sdk@1.8.0';
 import { createClient } from 'npm:@supabase/supabase-js@2.119.0';
+// Every header the Supabase SDK sends, so browser calls from the web build pass CORS checks.
+import { corsHeaders } from 'npm:@supabase/supabase-js@2.119.0/cors';
 
 const MODEL = 'claude-opus-5-5';
 const MAX_QUESTION_LENGTH = 500;
@@ -54,11 +56,6 @@ type ClickRow = {
 };
 
 const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY') });
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });

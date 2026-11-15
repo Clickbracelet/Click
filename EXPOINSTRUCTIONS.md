@@ -103,7 +103,7 @@ By default, Expo Go connects straight to your computer over the local network. B
 npx expo start --web
 ```
 
-This opens the app in your browser, which is handy for checking layouts quickly. On web, the **Continue with Google** button skips the real sign-in and goes straight to the next screen. Real sign-in only works on a phone.
+This opens the app in your browser at `http://localhost:8081`. It works like the phone app: Google sign-in, saving your profile, your clicks, Ask AI and click links (`http://localhost:8081/click/<click id>`) all work. Google sign-in opens in a popup window. If the browser blocks the popup, the sign-in continues in the same tab instead. Web sign-in needs `http://localhost:8081/**` in the Supabase redirect URLs (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)).
 
 ---
 
@@ -115,6 +115,7 @@ In the Supabase dashboard, go to **Authentication → URL Configuration → Redi
 
 - `exp://**` — covers the Expo Go URLs on any computer or network (for example `exp://192.168.1.20:8081/--/auth/callback`).
 - `clickbracelet://auth/callback` — used by native builds of the app.
+- `http://localhost:8081/**` — used by the web preview (`npx expo start --web`).
 
 This only needs doing once per Supabase project, not once per computer.
 
@@ -218,7 +219,7 @@ Your Node.js is too old. Install Node 22.13 or newer, then delete `node_modules`
 - **After picking a Google account, Safari opens a `localhost` page:** Supabase didn't recognize the app's return URL, so it fell back to the project's **Site URL** (by default `http://localhost:3000`). When you tap sign-in, the Expo terminal prints `Google sign-in redirect URL (add to Supabase Redirect URLs): exp://...`. Add that URL, or `exp://**`, under Supabase **Authentication → URL Configuration → Redirect URLs**, then try again. The `exp://` address changes with your computer's IP address and when you use `--tunnel`, which is why `exp://**` is easier.
 - Make sure the Expo Go redirect URLs are allowed in Supabase (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)).
 - Check the `.env` values point to the correct Supabase project.
-- Remember that sign-in is skipped in the web preview. Test it on a phone.
+- **On web, sign-in returns to `localhost:3000` or shows a redirect error:** add `http://localhost:8081/**` to the Supabase redirect URLs (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)). If you started Expo on a different port, use that port instead.
 
 ### The app looks tiny or doesn't fill the screen
 
