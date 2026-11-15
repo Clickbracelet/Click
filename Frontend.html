@@ -534,9 +534,11 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (!answer) { this.answerLocally(); return; }
       this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: answer.text, people: answer.people }]), asking: false });
     };
-    // Opens one click's profile, for links such as an NFC tag.
+    // Opens one click's card in the clicks list, for links such as an NFC tag:
+    // the same as tapping a person in the Ask chat.
     window.__clickOpenClick = (id) => {
-      this.setState({ screen: 'person', selectedId: id, fromSettings: false, editingLoc: false });
+      this.scrollToExpandedClick = true;
+      this.setState({ screen: 'clicks', filter: 'year', expandedId: id, noteOpenId: null, editingLoc: false });
     };
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('page-ready');
   }
@@ -695,11 +697,71 @@ let CLICK_DATA = [`
     // Signing out must not leave the previous account's profile in the form.
     patchOnce(
       "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', filter: 'year',",
-      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, filter: 'year',"
+      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, shareOpen: false, shareLink: '', shareQr: '', addPreview: null, filter: 'year',"
     );
     patchOnce(
       'style="align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; color: #7A5E66; font-size: 14px; text-decoration: underline">Sign out (restart demo)</button>',
       'style="height: 54px; border: 1px solid #C96578; border-radius: 999px; background: #FFFFFF; color: #C96578; font-size: 16px; font-weight: 600; cursor: pointer">Sign out</button>'
+    );
+
+    // Share my Click (SHAREPLAN.md Phase 3). The app gets the share link and draws its
+    // QR code, then sets shareLink and shareQr. An add link opened on this phone sets
+    // addPreview, and the card's answer goes back to the app.
+    patchOnce(
+      "      editSocials: set({ screen: 'socials', fromSettings: true }),",
+      `      editSocials: set({ screen: 'socials', fromSettings: true }),
+      openShare: () => { this.setState({ shareOpen: true }); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('get-share-link'); },
+      shareOpen: !!s.shareOpen, shareLink: s.shareLink || '', shareQr: s.shareQr || '', shareReady: !!s.shareLink, shareLoading: !s.shareLink,
+      shareSend: () => { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('share-profile'); },
+      shareReset: () => { if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('reset-share-link'); },
+      shareClose: set({ shareOpen: false }),
+      addOpen: !!s.addPreview,
+      addName: (s.addPreview && s.addPreview.name) || 'this person',
+      addDesc: (s.addPreview && s.addPreview.description) || '', addHasDesc: !!(s.addPreview && s.addPreview.description),
+      addPhoto: (s.addPreview && s.addPreview.photo) || '', addHasPhoto: !!(s.addPreview && s.addPreview.photo), addNoPhoto: !(s.addPreview && s.addPreview.photo),
+      addInitial: ((s.addPreview && s.addPreview.name) || '?').trim().charAt(0).toUpperCase() || '?',
+      addAccept: () => { this.setState({ addPreview: null }); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'add-share-answer', add: true })); },
+      addDecline: () => { this.setState({ addPreview: null }); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'add-share-answer', add: false })); },`
+    );
+    patchOnce(
+      '<div style="display: flex; flex-direction: column; border: 1px solid #E7DFD6; border-radius: 20px; background: #FFFFFF; overflow: hidden">\n<button type="button" sc-camel-on-click="{{editProfile}}"',
+      '<button type="button" sc-camel-on-click="{{openShare}}" style="height: 54px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(201,161,74,0.28)">Share my Click</button>\n<div style="display: flex; flex-direction: column; border: 1px solid #E7DFD6; border-radius: 20px; background: #FFFFFF; overflow: hidden">\n<button type="button" sc-camel-on-click="{{editProfile}}"'
+    );
+    patchOnce(
+      '<sc-if value="{{showTabs}}" hint-placeholder-val="{{false}}">\n<nav aria-label="Main"',
+      `<sc-if value="{{shareOpen}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(46,15,27,0.42)">
+<div role="dialog" aria-modal="true" aria-label="Share your Click" style="width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 24px 20px 34px; border-radius: 28px 28px 0 0; background: #FAF7F2">
+<h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: 30px; line-height: 1">Share your Click</h2>
+<p style="margin: 0; font-size: 14px; line-height: 1.45; color: #7A5E66">Anyone who scans this code or opens your link can add you as a click. They'll see your name, photo, bio, interests and socials.</p>
+<sc-if value="{{shareLoading}}" hint-placeholder-val="{{false}}"><p style="margin: 0; padding: 48px 0; text-align: center; font-size: 14px; color: #7A5E66">Getting your link…</p></sc-if>
+<sc-if value="{{shareReady}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 14px">
+<img src="{{shareQr}}" alt="QR code for your share link" style="align-self: center; width: 200px; height: 200px; box-sizing: border-box; padding: 10px; border: 1px solid #E7DFD6; border-radius: 20px; background: #FFFFFF">
+<p style="margin: 0; padding: 12px 14px; border: 1px solid #E7DFD6; border-radius: 14px; background: #FFFFFF; font-size: 13px; line-height: 1.4; color: #4A1A2C; word-break: break-all; font-variant-ligatures: none; user-select: all; -webkit-user-select: all">{{shareLink}}</p>
+<button type="button" sc-camel-on-click="{{shareSend}}" style="height: 54px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(201,161,74,0.28)">Share link</button>
+<button type="button" sc-camel-on-click="{{shareReset}}" style="align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; color: #7A5E66; font-size: 14px; text-decoration: underline">Reset link</button>
+</div></sc-if>
+<button type="button" sc-camel-on-click="{{shareClose}}" style="height: 54px; border: 1px solid #E7DFD6; border-radius: 999px; background: #FFFFFF; color: #4A1A2C; font-size: 16px; font-weight: 500; cursor: pointer">Done</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{addOpen}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; z-index: 21; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; background: rgba(46,15,27,0.42)">
+<div role="dialog" aria-modal="true" aria-label="Add {{addName}}" style="width: 100%; max-width: 360px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 20px 20px; border-radius: 28px; background: #FAF7F2; text-align: center">
+<span style="width: 88px; height: 88px; flex: none; border-radius: 999px; background: #F5F0E8; overflow: hidden; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 38px; font-weight: 600">
+<sc-if value="{{addHasPhoto}}" hint-placeholder-val="{{false}}"><img src="{{addPhoto}}" alt="" style="width: 100%; height: 100%; object-fit: cover"></sc-if>
+<sc-if value="{{addNoPhoto}}" hint-placeholder-val="{{true}}">{{addInitial}}</sc-if>
+</span>
+<h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: 30px; line-height: 1.05">Add {{addName}}?</h2>
+<sc-if value="{{addHasDesc}}" hint-placeholder-val="{{false}}"><p style="margin: 0; font-size: 14px; line-height: 1.45; color: #4A1A2C">{{addDesc}}</p></sc-if>
+<p style="margin: 0; font-size: 13px; line-height: 1.45; color: #7A5E66">They shared their Click with you. Adding saves their profile to your clicks.</p>
+<button type="button" sc-camel-on-click="{{addAccept}}" style="align-self: stretch; height: 54px; margin-top: 6px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(201,161,74,0.28)">Add to my clicks</button>
+<button type="button" sc-camel-on-click="{{addDecline}}" style="align-self: stretch; height: 54px; border: 1px solid #E7DFD6; border-radius: 999px; background: #FFFFFF; color: #4A1A2C; font-size: 16px; font-weight: 500; cursor: pointer">Not now</button>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{showTabs}}" hint-placeholder-val="{{false}}">
+<nav aria-label="Main"`
     );
 
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT

@@ -1,9 +1,10 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef } from 'react';
-import { Alert, Platform, SafeAreaView, StyleSheet } from 'react-native';
+import { Alert, Platform, SafeAreaView, Share, StyleSheet } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { FunctionsHttpError } from '@supabase/supabase-js';
+import qrcode from 'qrcode-generator';
 import { ClickPage, type ClickPageHandle } from './src/ClickPage';
 import { supabase } from './src/supabase';
 
@@ -17,6 +18,22 @@ const showAlert = (title: string, message: string) => {
   if (Platform.OS === 'web') window.alert(`${title}\n\n${message}`);
   else Alert.alert(title, message);
 };
+
+// Resolves true if the user picks the action, false if they cancel.
+const confirmAction = (title: string, message: string, action: string) =>
+  Platform.OS === 'web'
+    ? Promise.resolve(window.confirm(`${title}\n\n${message}`))
+    : new Promise<boolean>((resolve) =>
+        Alert.alert(
+          title,
+          message,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: action, onPress: () => resolve(true) },
+          ],
+          { cancelable: true, onDismiss: () => resolve(false) },
+        ),
+      );
 
 // Sent by Frontend.html after the profile or socials screen.
 type ProfileMessage = {
@@ -41,21 +58,35 @@ type AskMessage = {
 };
 type AskAnswer = { text: string; people: { id: string; reason: string }[] };
 
-// Links that open one click's profile, for example from an NFC tag:
-//   Expo Go:    exp://<computer IP>:8081/--/click/<click id>
-//   App builds: clickbracelet://click/<click id>
-const clickIdFromUrl = (url: string | null) => {
+// Links the app opens, for example from an NFC tag or a shared link:
+//   click/<click id>    opens one of your clicks, expanded in the clicks list
+//   add/<share code>    adds the person who shared the link as a click (SHAREPLAN.md)
+// In Expo Go they look like exp://<computer IP>:8081/--/click/<click id>, in app builds
+// clickbracelet://click/<click id>, and on web http://localhost:8081/click/<click id>.
+type AppLink = { kind: 'click'; id: string } | { kind: 'add'; code: string };
+const parseLink = (url: string | null): AppLink | null => {
   if (!url) return null;
   const { hostname, path } = Linking.parse(url);
-  const route = hostname === 'click' ? `click/${path ?? ''}` : (path ?? '');
-  const match = /^click\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i.exec(route);
-  return match ? match[1].toLowerCase() : null;
+  const route = hostname === 'click' || hostname === 'add' ? `${hostname}/${path ?? ''}` : (path ?? '');
+  const click = /^click\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i.exec(route);
+  if (click) return { kind: 'click', id: click[1].toLowerCase() };
+  const add = /^add\/([0-9A-Za-z]{10})\/?$/.exec(route);
+  return add ? { kind: 'add', code: add[1] } : null;
 };
 
 type PageMessage =
   | { type: 'save-profile'; profile: ProfileMessage }
   | { type: 'update-clicks'; changes: ClickChange[] }
+  | { type: 'add-share-answer'; add: boolean }
   | AskMessage;
+
+// The page can't load a QR library from the internet, so the app draws the code.
+const qrDataUrl = (text: string) => {
+  const qr = qrcode(0, 'M');
+  qr.addData(text);
+  qr.make();
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(qr.createSvgTag({ cellSize: 4, margin: 2, scalable: true }))}`;
+};
 
 export default function App() {
   const page = useRef<ClickPageHandle>(null);
@@ -66,6 +97,9 @@ export default function App() {
   const loadedUserId = useRef<string | null>(null);
   const loadedClickIds = useRef(new Set<string>());
   const pendingClickId = useRef<string | null>(null);
+  const pendingShareCode = useRef<string | null>(null);
+  // Answers the page's "Add this person?" card.
+  const pendingAddAnswer = useRef<((add: boolean) => void) | null>(null);
 
   const setPageState = (patch: Record<string, unknown>) => {
     page.current?.injectJavaScript(`window.__clickApp && window.__clickApp.setState(${JSON.stringify(patch)}); true;`);
@@ -176,14 +210,82 @@ export default function App() {
     `);
     if (loaded) {
       loadedUserId.current = userId;
-      await openPendingClick();
+      await openPendingLink();
     }
   };
 
-  // Opens the click a link asked for once the page is up and the user's clicks are loaded.
-  const openPendingClick = async () => {
-    const id = pendingClickId.current;
-    if (!id || !pageReady.current) return;
+  // The link that adds the signed-in user as a click on someone else's phone.
+  const getShareLink = async () => {
+    const { data: code, error } = await supabase.rpc('get_my_share_code');
+    if (error) throw error;
+    return Linking.createURL(`add/${code}`);
+  };
+
+  // Fills the page's Share sheet with the link and its QR code.
+  const showShareLink = (url: string) => setPageState({ shareLink: url, shareQr: qrDataUrl(url) });
+
+  const resetShareLink = async () => {
+    const reset = await confirmAction(
+      'Reset your share link?',
+      "Links and QR codes you've already shared will stop working. You'll get a new one.",
+      'Reset',
+    );
+    if (!reset) return;
+    const { data: code, error } = await supabase.rpc('reset_share_code');
+    if (error) throw error;
+    showShareLink(Linking.createURL(`add/${code}`));
+  };
+
+  // Shows the page's "Add this person?" card and waits for the answer.
+  const askToAdd = (preview: { name: string; description: string | null; photo_url: string | null }) =>
+    new Promise<boolean>((resolve) => {
+      pendingAddAnswer.current?.(false);
+      pendingAddAnswer.current = resolve;
+      setPageState({ addPreview: { name: preview.name, description: preview.description ?? '', photo: preview.photo_url ?? '' } });
+    });
+
+  const shareProfile = async () => {
+    const url = await getShareLink();
+    const message = `Add me on Click: ${url}`;
+    if (Platform.OS !== 'web') {
+      await Share.share({ message });
+    } else if (navigator.share) {
+      // Closing the browser's share sheet rejects; that isn't an error.
+      await navigator.share({ title: 'Add me on Click', url }).catch(() => undefined);
+    } else {
+      await navigator.clipboard.writeText(url);
+      showAlert('Link copied', `Send this link to add you as a click:\n${url}`);
+    }
+  };
+
+  // Shows who a share link belongs to and, if the user agrees, adds them as a click.
+  // Returns the click's id, or null if nothing was added.
+  const addFromShare = async (code: string) => {
+    const { data: preview, error } = await supabase.rpc('get_share_preview', { code }).maybeSingle<{
+      name: string;
+      photo_url: string | null;
+      description: string | null;
+      is_self: boolean;
+    }>();
+    if (error) throw error;
+    if (!preview) {
+      showAlert('Link not valid', 'That share link is no longer valid. Ask them to send a new one.');
+      return null;
+    }
+    if (preview.is_self) {
+      showAlert('This is your link', 'Send it to someone else so they can add you as a click.');
+      return null;
+    }
+    if (!(await askToAdd(preview))) return null;
+    const { data: clickId, error: addError } = await supabase.rpc('add_click_from_share', { code });
+    if (addError) throw addError;
+    await loadClicks();
+    return clickId as string;
+  };
+
+  // Acts on the link that opened the app once the page is up and the user's clicks are loaded.
+  const openPendingLink = async () => {
+    if ((!pendingClickId.current && !pendingShareCode.current) || !pageReady.current) return;
     if (!loadedUserId.current) {
       // Still signed in from an earlier visit: load their data without the welcome screen.
       // Otherwise the link waits until they sign in.
@@ -191,6 +293,18 @@ export default function App() {
       if (current.session) await continueAfterSignIn(current.session.user.id);
       return;
     }
+    const code = pendingShareCode.current;
+    if (code) {
+      pendingShareCode.current = null;
+      try {
+        const clickId = await addFromShare(code);
+        if (clickId) pendingClickId.current = clickId;
+      } catch (error) {
+        showAlert('Could not add this person', error instanceof Error ? error.message : 'Please try again.');
+      }
+    }
+    const id = pendingClickId.current;
+    if (!id) return;
     pendingClickId.current = null;
     if (!loadedClickIds.current.has(id)) {
       showAlert('Click not found', "That click isn't in this account.");
@@ -232,10 +346,13 @@ export default function App() {
   // Listens to every incoming link, so tapping the same tag twice opens it again.
   useEffect(() => {
     const handleUrl = (url: string | null) => {
-      const id = clickIdFromUrl(url);
-      if (!id) return;
-      pendingClickId.current = id;
-      void openPendingClick();
+      const link = parseLink(url);
+      if (!link) return;
+      if (link.kind === 'click') pendingClickId.current = link.id;
+      else pendingShareCode.current = link.code;
+      // So refreshing the page doesn't ask to add the same person again.
+      if (Platform.OS === 'web' && link.kind === 'add') window.history.replaceState(null, '', '/');
+      void openPendingLink();
     };
     void Linking.getInitialURL().then(handleUrl);
     const subscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
@@ -257,6 +374,9 @@ export default function App() {
         } catch (error) {
           showAlert('Could not save your click changes', error instanceof Error ? error.message : 'Please try again.');
         }
+      } else if (parsed.type === 'add-share-answer') {
+        pendingAddAnswer.current?.(parsed.add);
+        pendingAddAnswer.current = null;
       } else if (parsed.type === 'ask') {
         await askClicks(parsed);
       }
@@ -311,8 +431,29 @@ export default function App() {
     } else if (message === 'page-ready') {
       pageReady.current = true;
       await openPendingSignIn();
-      await openPendingClick();
+      await openPendingLink();
+    } else if (message === 'get-share-link') {
+      try {
+        showShareLink(await getShareLink());
+      } catch (error) {
+        setPageState({ shareOpen: false });
+        showAlert('Could not get your share link', error instanceof Error ? error.message : 'Please try again.');
+      }
+    } else if (message === 'reset-share-link') {
+      try {
+        await resetShareLink();
+      } catch (error) {
+        showAlert('Could not reset your share link', error instanceof Error ? error.message : 'Please try again.');
+      }
+    } else if (message === 'share-profile') {
+      try {
+        await shareProfile();
+      } catch (error) {
+        showAlert('Could not share your Click', error instanceof Error ? error.message : 'Please try again.');
+      }
     } else if (message === 'sign-out') {
+      pendingAddAnswer.current?.(false);
+      pendingAddAnswer.current = null;
       loadedUserId.current = null;
       loadedClickIds.current = new Set();
       const { error } = await supabase.auth.signOut();
