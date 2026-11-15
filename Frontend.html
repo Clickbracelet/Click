@@ -544,7 +544,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       clearTimeout(this.askTimer);
       if (!answer) { this.answerLocally(); return; }
       const usedFreeAsk = !this.state.askPremium && this.state.askUses < 1;
-      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: answer.text, people: answer.people }]), asking: false, askUses: usedFreeAsk ? 1 : this.state.askUses, askPaywall: usedFreeAsk });
+      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: answer.text, people: answer.people }]), asking: false, askUses: usedFreeAsk ? 1 : this.state.askUses });
     };
     // Opens one click's card in the clicks list, for links such as an NFC tag:
     // the same as tapping a person in the Ask chat.
@@ -823,7 +823,18 @@ let CLICK_DATA = [`
       this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false });
     }, 650);`,
       `    if (!this.state.askPremium && this.state.askUses >= 1) {
-      this.setState({ askPaywall: true });
+      // A direct DOM fallback guarantees the gate is visible even if the chat
+      // view is in the middle of its scroll-preserving render cycle.
+      if (!document.querySelector('[data-ask-premium-gate]')) {
+        const gate = document.createElement('div');
+        gate.setAttribute('data-ask-premium-gate', '');
+        gate.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;box-sizing:border-box;background:rgba(45,20,31,.46)';
+        gate.innerHTML = '<div role="dialog" aria-modal="true" aria-label="Upgrade to Premium" style="width:min(100%,348px);box-sizing:border-box;border-radius:20px;padding:26px 22px 22px;background:#FAF7F2;box-shadow:0 16px 42px rgba(45,20,31,.28);display:flex;flex-direction:column;gap:14px"><div style="width:42px;height:42px;border-radius:999px;background:#F1E3BF;display:flex;align-items:center;justify-content:center;color:#4A1A2C;font-size:21px">✦</div><div><h2 style="margin:0;font-family:Georgia,serif;font-size:31px;line-height:1;color:#4A1A2C">Upgrade to Premium</h2><p style="margin:8px 0 0;color:#7A5E66;font-size:14px;line-height:1.45">You’ve used your one free Ask. Upgrade for unlimited answers.</p></div><button type="button" data-ask-upgrade style="height:50px;border:0;border-radius:999px;background:linear-gradient(90deg,#E0C27F,#C9A14A 50%,#C38A6C);color:#4A1A2C;font-size:15px;font-weight:700;cursor:pointer">Upgrade to Premium · $4.99/month</button><div style="display:flex;align-items:center;gap:9px;color:#A99A91;font-size:12px"><span style="height:1px;flex:1;background:#E7DFD6"></span>access code<span style="height:1px;flex:1;background:#E7DFD6"></span></div><div style="display:flex;gap:8px"><input data-ask-code placeholder="Enter access code" aria-label="Access code" style="min-width:0;flex:1;height:46px;box-sizing:border-box;padding:0 14px;border:1px solid #D8C9BA;border-radius:14px;background:#FFFFFF;color:#4A1A2C;font-size:15px"><button type="button" data-ask-unlock style="height:46px;padding:0 16px;border:1px solid #4A1A2C;border-radius:14px;background:#FFFFFF;color:#4A1A2C;font-weight:700;cursor:pointer">Unlock</button></div><p data-ask-code-error style="display:none;margin:-6px 0 0;color:#A44A4A;font-size:12px">That access code isn’t valid.</p></div>';
+        const unlock = () => { this.setState({ askPremium: true, askPaywall: false, askPromo: '', askPromoError: false }); gate.remove(); };
+        gate.querySelector('[data-ask-upgrade]').onclick = unlock;
+        gate.querySelector('[data-ask-unlock]').onclick = () => { const code = gate.querySelector('[data-ask-code]').value.trim().toLowerCase(); if (code === 'coffee') unlock(); else gate.querySelector('[data-ask-code-error]').style.display = 'block'; };
+        document.body.appendChild(gate);
+      }
       return;
     }
     const people = CLICK_DATA.filter((p) => !this.state.removed[p.id]);
@@ -833,7 +844,7 @@ let CLICK_DATA = [`
     this.answerLocally = () => {
       const a = askClick(text, people);
       const usedFreeAsk = !this.state.askPremium && this.state.askUses < 1;
-      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false, askUses: usedFreeAsk ? 1 : this.state.askUses, askPaywall: usedFreeAsk });
+      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false, askUses: usedFreeAsk ? 1 : this.state.askUses });
     };
     if (!window.ReactNativeWebView || !this.syncedClicks) {
       this.askTimer = setTimeout(this.answerLocally, 650);
@@ -853,15 +864,14 @@ let CLICK_DATA = [`
     patchOnce(
       '<sc-if value="{{isAsk}}" hint-placeholder-val="{{true}}">',
       `<sc-if value="{{askPaywall}}" hint-placeholder-val="{{false}}">
-<div style="position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; padding: 18px; box-sizing: border-box; background: rgba(45, 20, 31, 0.46)">
-  <div role="dialog" aria-modal="true" aria-label="Unlock Ask Click" style="width: 100%; box-sizing: border-box; border-radius: 28px; padding: 26px 22px 22px; background: #FAF7F2; box-shadow: 0 16px 42px rgba(45,20,31,0.28); display: flex; flex-direction: column; gap: 14px">
+<div style="position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; background: rgba(45, 20, 31, 0.46)">
+  <div role="dialog" aria-modal="true" aria-label="Upgrade to Premium" style="width: min(100%, 348px); box-sizing: border-box; border-radius: 20px; padding: 26px 22px 22px; background: #FAF7F2; box-shadow: 0 16px 42px rgba(45,20,31,0.28); display: flex; flex-direction: column; gap: 14px">
     <div style="width: 42px; height: 42px; border-radius: 999px; background: #F1E3BF; display: flex; align-items: center; justify-content: center; color: #4A1A2C; font-size: 21px">✦</div>
-    <div><h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 31px; line-height: 1; color: #4A1A2C">Unlock Ask Click</h2><p style="margin: 8px 0 0; color: #7A5E66; font-size: 14px; line-height: 1.45">You’ve used your complimentary Ask. Get unlimited help remembering the people you click with.</p></div>
-    <button type="button" sc-camel-on-click="{{unlockAskPremium}}" style="height: 50px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 15px; font-weight: 700; cursor: pointer">Unlock Ask Click · $4.99/month</button>
-    <div style="display: flex; align-items: center; gap: 9px; color: #A99A91; font-size: 12px"><span style="height: 1px; flex: 1; background: #E7DFD6"></span>or use a promo code<span style="height: 1px; flex: 1; background: #E7DFD6"></span></div>
-    <div style="display: flex; gap: 8px"><input value="{{askPromo}}" sc-camel-on-change="{{onAskPromo}}" placeholder="Promo code" aria-label="Promo code" style="min-width: 0; flex: 1; height: 46px; box-sizing: border-box; padding: 0 14px; border: 1px solid #D8C9BA; border-radius: 14px; background: #FFFFFF; color: #4A1A2C; font-size: 15px"><button type="button" sc-camel-on-click="{{redeemAskPromo}}" style="height: 46px; padding: 0 16px; border: 1px solid #4A1A2C; border-radius: 14px; background: #FFFFFF; color: #4A1A2C; font-weight: 700; cursor: pointer">Apply</button></div>
-    <sc-if value="{{askPromoError}}" hint-placeholder-val="{{false}}"><p style="margin: -6px 0 0; color: #A44A4A; font-size: 12px">That promo code isn’t valid.</p></sc-if>
-    <button type="button" sc-camel-on-click="{{closeAskPaywall}}" style="border: 0; background: transparent; color: #7A5E66; font-size: 14px; cursor: pointer">Not now</button>
+    <div><h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 31px; line-height: 1; color: #4A1A2C">Upgrade to Premium</h2><p style="margin: 8px 0 0; color: #7A5E66; font-size: 14px; line-height: 1.45">You’ve used your one free Ask. Upgrade for unlimited help remembering the people you click with.</p></div>
+    <button type="button" sc-camel-on-click="{{unlockAskPremium}}" style="height: 50px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 15px; font-weight: 700; cursor: pointer">Upgrade to Premium · $4.99/month</button>
+    <div style="display: flex; align-items: center; gap: 9px; color: #A99A91; font-size: 12px"><span style="height: 1px; flex: 1; background: #E7DFD6"></span>access code<span style="height: 1px; flex: 1; background: #E7DFD6"></span></div>
+    <div style="display: flex; gap: 8px"><input value="{{askPromo}}" sc-camel-on-change="{{onAskPromo}}" placeholder="Enter access code" aria-label="Access code" style="min-width: 0; flex: 1; height: 46px; box-sizing: border-box; padding: 0 14px; border: 1px solid #D8C9BA; border-radius: 14px; background: #FFFFFF; color: #4A1A2C; font-size: 15px"><button type="button" sc-camel-on-click="{{redeemAskPromo}}" style="height: 46px; padding: 0 16px; border: 1px solid #4A1A2C; border-radius: 14px; background: #FFFFFF; color: #4A1A2C; font-weight: 700; cursor: pointer">Unlock</button></div>
+    <sc-if value="{{askPromoError}}" hint-placeholder-val="{{false}}"><p style="margin: -6px 0 0; color: #A44A4A; font-size: 12px">That access code isn’t valid.</p></sc-if>
   </div>
 </div>
 </sc-if>
