@@ -501,6 +501,64 @@ document.addEventListener('DOMContentLoaded', async function() {
         '<p style="margin: 0; font-size: 14px; font-weight: 500">Add app or website</p><p style="margin: -8px 0 0; font-size: 13px; line-height: 1.45; color: #A99A91">The selected apps will be visible when in {{editModeName}} mode.</p>'
       );
 
+    // Supabase profile sync: the Expo app owns the Supabase client, so the page
+    // posts the profile to it after the profile or socials screen and the app
+    // pushes a saved profile back in through window.__clickApp.
+    const patchOnce = (from, to) => {
+      if (template.indexOf(from) === -1) console.error('[click] profile sync patch did not apply:', from.slice(0, 80));
+      template = template.replace(from, to);
+    };
+    patchOnce(
+      'componentWillUnmount() { clearTimeout(this.pairTimer); clearTimeout(this.askTimer); }',
+      `componentDidMount() { window.__clickApp = this; this.lastScreen = this.state.screen; }
+
+  componentDidUpdate() {
+    const st = this.state;
+    const prev = this.lastScreen;
+    this.lastScreen = st.screen;
+    if (prev === st.screen || (prev !== 'profile' && prev !== 'socials') || !window.ReactNativeWebView) return;
+    const socials = {};
+    Object.keys(st.on).forEach((id) => { if (st.on[id] && (st.handles[id] || '').trim()) socials[id] = st.handles[id].trim(); });
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'save-profile', profile: {
+      name: st.profName.trim(),
+      bio: st.profBio.trim(),
+      interests: [st.tag1, st.tag2, st.tag3, st.tag4 || ''].map((t) => t.trim()),
+      socials: socials,
+      customLinks: st.customLinks,
+      photo: st.photo.indexOf('data:') === 0 ? st.photo : undefined
+    } }));
+  }
+
+  componentWillUnmount() { clearTimeout(this.pairTimer); clearTimeout(this.askTimer); }`
+    );
+    // Shrink the photo to a small JPEG data URL so it can be handed to the app and uploaded.
+    patchOnce(
+      'if (f) this.setState({ photo: URL.createObjectURL(f) });',
+      `if (!f) return;
+        const url = URL.createObjectURL(f);
+        const img = new Image();
+        img.onload = () => {
+          const scale = Math.min(1, 512 / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          URL.revokeObjectURL(url);
+          this.setState({ photo: canvas.toDataURL('image/jpeg', 0.85) });
+        };
+        img.onerror = () => this.setState({ photo: url });
+        img.src = url;`
+    );
+    // Signing out must not leave the previous account's profile in the form.
+    patchOnce(
+      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', filter: 'year',",
+      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, filter: 'year',"
+    );
+    patchOnce(
+      'style="align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; color: #7A5E66; font-size: 14px; text-decoration: underline">Sign out (restart demo)</button>',
+      'style="height: 54px; border: 1px solid #C96578; border-radius: 999px; background: #FFFFFF; color: #C96578; font-size: 16px; font-weight: 600; cursor: pointer">Sign out</button>'
+    );
+
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT
     // document's manifest; frame srcs carry an about:blank#<uuid> marker
     // instead of a substitutable uuid. Every document mints the blobs for
