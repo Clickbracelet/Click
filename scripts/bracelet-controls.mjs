@@ -8,11 +8,37 @@ function errorMessage(error) {
   return error.message;
 }
 
-export function createBraceletControls({ update, updateTimeline, selectDemoOwner }) {
+export function createBraceletControls({ update, updateTimeline, selectBraceletOwner }) {
   let bracelet;
   let connected = null;
   let busy = false;
   let closed = false;
+  const profileUpdates = typeof window.BroadcastChannel === 'function'
+    ? new window.BroadcastChannel('click-local-demo-profiles') : null;
+
+  async function requestJson(url, body) {
+    const options = body === undefined ? undefined : {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    };
+    const response = await fetch(url, options);
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || 'The local Click preview could not finish the request.');
+    return result;
+  }
+
+  async function refreshTimeline() {
+    const { timeline } = await requestJson('/api/encounters/timeline');
+    if (!closed) updateTimeline(timeline);
+  }
+
+  function refreshOnFocus() {
+    refreshTimeline().catch(() => {});
+  }
+
+  window.addEventListener('focus', refreshOnFocus);
+  profileUpdates?.addEventListener('message', refreshOnFocus);
 
   function publish(message = '') {
     if (!closed) update({ braceletInfo: connected, braceletBusy: busy, braceletMessage: message });
@@ -57,20 +83,15 @@ export function createBraceletControls({ update, updateTimeline, selectDemoOwner
     await client.setTime();
     const result = await client.sync(async (records, info) => {
       if (info.userId !== ownerId || info.deviceId !== connected?.deviceId) {
-        throw new Error('The bracelet no longer matches the selected demo account.');
+        throw new Error('The bracelet’s identity changed. Disconnect and pair it again.');
       }
-      const response = await fetch('/api/encounters/batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ownerId, deviceId: info.deviceId, records }),
-      });
-      const receipt = await response.json();
-      if (!response.ok) throw new Error(receipt.error || 'Unable to save encounters.');
+      const receipt = await requestJson('/api/encounters/batch', { ownerId, deviceId: info.deviceId, records });
       if (!closed) updateTimeline(receipt.timeline);
       return receipt.acceptedEventIds;
     });
 
     const count = result.acknowledged.length;
+    if (count === 0) await refreshTimeline();
     return count > 0
       ? `Synced ${count} ${count === 1 ? 'encounter' : 'encounters'}. Disconnect before tapping.`
       : result.info.pendingCount > 0
@@ -79,25 +100,31 @@ export function createBraceletControls({ update, updateTimeline, selectDemoOwner
   }
 
   return {
-    choose(ownerId, switching = false) {
+    async saveProfileName(ownerId, displayName) {
+      const { timeline } = await requestJson('/api/demo-profile', { ownerId, displayName });
+      if (!closed) {
+        updateTimeline(timeline);
+        profileUpdates?.postMessage('updated');
+      }
+    },
+    choose() {
       return run('Choose your bracelet in Chrome…', async () => {
         dropConnection();
         const client = openClient();
         // Start the chooser inside the click handler, before any other await.
         const info = await client.connect();
         if (closed) return;
-        if (info.userId !== ownerId && !(switching && selectDemoOwner(info.userId))) {
+        if (!selectBraceletOwner(info.userId)) {
           dropConnection();
-          return `This bracelet belongs to ${info.userId}. Select that demo account to sync it.`;
+          return 'Choose one of the two bracelets configured for this local demo.';
         }
         connected = info;
-        if (!switching) return save(client, ownerId);
-        return 'Bracelet connected. Choose Sync now to read encounters.';
+        return save(client, info.userId);
       });
     },
-    sync(ownerId) {
-      if (connected?.userId !== ownerId) return;
-      return run('Reading and saving encounters…', () => save(bracelet, ownerId));
+    sync() {
+      if (!connected) return;
+      return run('Reading and saving encounters…', () => save(bracelet, connected.userId));
     },
     disconnect() {
       if (busy) return;
@@ -106,6 +133,8 @@ export function createBraceletControls({ update, updateTimeline, selectDemoOwner
     },
     close() {
       closed = true;
+      window.removeEventListener('focus', refreshOnFocus);
+      profileUpdates?.close();
       dropConnection();
     },
   };

@@ -7,7 +7,7 @@ const USER_ID = /^[A-Za-z0-9_.@-]{1,64}$/;
 
 export class InvalidBatch extends Error {}
 
-export function projectEncounters(records) {
+export function projectEncounters(records, profileNames = new Map()) {
   const accounts = Object.fromEntries(owners.map((owner) => [owner, []]));
   const saved = new Map();
   for (const record of records) {
@@ -21,7 +21,7 @@ export function projectEncounters(records) {
       continue;
     }
     const clicks = accounts[ownerId];
-    const click = { id: `${ownerId}-${clicks.length}`, peerId, timestampMs };
+    const click = { id: `${ownerId}-${clicks.length}`, peerId, peerName: profileNames.get(peerId) ?? null, timestampMs };
     saved.set(key, click);
     clicks.push(click);
   }
@@ -50,6 +50,15 @@ export function openEncounterStore(filename) {
       timestampMs INTEGER,
       PRIMARY KEY (ownerId, deviceId, eventId)
     ) STRICT;
+    CREATE TABLE IF NOT EXISTS demo_profile_names (
+      ownerId TEXT PRIMARY KEY NOT NULL,
+      displayName TEXT NOT NULL
+    ) STRICT;
+  `);
+  const listNames = database.prepare('SELECT ownerId, displayName FROM demo_profile_names');
+  const saveName = database.prepare(`
+    INSERT INTO demo_profile_names (ownerId, displayName) VALUES (?, ?)
+    ON CONFLICT (ownerId) DO UPDATE SET displayName = excluded.displayName
   `);
   const select = database.prepare("SELECT *, 'confirmed' AS status FROM encounters ORDER BY rowid");
   const find = database.prepare('SELECT peerId FROM encounters WHERE ownerId = ? AND deviceId = ? AND eventId = ?');
@@ -61,6 +70,15 @@ export function openEncounterStore(filename) {
 
   return {
     list: () => select.all(),
+    profileNames: () => new Map(listNames.all().map(({ ownerId, displayName }) => [ownerId, displayName])),
+    saveProfileName(profile) {
+      const { ownerId, displayName } = profile ?? {};
+      const name = typeof displayName === 'string' ? displayName.trim() : '';
+      if (!owners.includes(ownerId) || !name || name.length > 80 || /\p{Cc}/u.test(name)) {
+        throw new InvalidBatch('Choose a demo bracelet and enter a name of up to 80 characters.');
+      }
+      saveName.run(ownerId, name);
+    },
     saveBatch(batch) {
       const { ownerId, deviceId, records } = batch ?? {};
       if (!owners.includes(ownerId) || typeof deviceId !== 'string' || !DEVICE_ID.test(deviceId)

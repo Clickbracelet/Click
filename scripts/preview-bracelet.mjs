@@ -24,7 +24,7 @@ async function timeline() {
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
-  return projectEncounters([...records, ...store.list()]);
+  return projectEncounters([...records, ...store.list()], store.profileNames());
 }
 
 async function batchBody(request) {
@@ -67,13 +67,23 @@ const server = createServer(async (request, response) => {
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(preview);
       return;
     }
-    if (request.method === 'POST' && request.url === '/api/encounters/batch') {
+    if (request.method === 'GET' && request.url === '/api/encounters/timeline') {
+      json(response, 200, { timeline: await timeline() });
+      return;
+    }
+    if (request.method === 'POST' && ['/api/encounters/batch', '/api/demo-profile'].includes(request.url)) {
       if (request.headers.origin !== `http://${request.headers.host}`
         || request.headers['content-type']?.split(';')[0] !== 'application/json') {
         json(response, 403, { error: 'Sync must start from the local Click page.' });
         return;
       }
-      const acceptedEventIds = store.saveBatch(await batchBody(request));
+      const body = await batchBody(request);
+      if (request.url === '/api/demo-profile') {
+        store.saveProfileName(body);
+        json(response, 200, { timeline: await timeline() });
+        return;
+      }
+      const acceptedEventIds = store.saveBatch(body);
       json(response, 200, { acceptedEventIds, timeline: await timeline() });
       return;
     }
