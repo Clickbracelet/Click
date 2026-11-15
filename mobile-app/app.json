@@ -10,7 +10,7 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ab360.click-bracelet"
+      "bundleIdentifier": "com.sabinechung.clickbracelet"
     },
     "android": {
       "adaptiveIcon": {
