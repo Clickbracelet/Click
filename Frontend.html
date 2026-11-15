@@ -555,8 +555,21 @@ document.addEventListener('DOMContentLoaded', async function() {
     // The app's reply to 'delete-account'. Once deleted, the page resets like signing out.
     window.__clickAccountDeleted = (deleted) => {
       if (!deleted) { this.setState({ deleting: false }); return; }
-      clearTimeout(this.clickSyncTimer); clearTimeout(this.askTimer); this.syncedClicks = null; this.pendingAskId = null; CLICK_DATA = [];
-      this.setState({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, shareOpen: false, shareLink: '', shareQr: '', shareTagLink: '', addPreview: null, deleteOpen: false, deleting: false, filter: 'year', removed: {}, events: {}, notes: {}, expandedId: null, chat: [], chatDraft: '' });
+      clearTimeout(this.clickSyncTimer); clearTimeout(this.askTimer); clearTimeout(this.presetSyncTimer); this.syncedClicks = null; this.syncedPresets = null; this.pendingAskId = null; CLICK_DATA = [];
+      this.setState({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], presets: this.defaultPresets, activePreset: this.defaultActivePreset, profileIdentityError: false, socialError: false, asking: false, shareOpen: false, shareLink: '', shareQr: '', shareTagLink: '', addPreview: null, deleteOpen: false, deleting: false, filter: 'year', removed: {}, events: {}, notes: {}, expandedId: null, chat: [], chatDraft: '' });
+    };
+    // Presets decide which socials a click receives, so they're saved with the profile.
+    // The app passes the saved ones in after sign-in (null before the profile exists);
+    // from then on each change is sent back to the app.
+    this.defaultPresets = this.state.presets;
+    this.defaultActivePreset = this.state.activePreset;
+    window.__clickSetPresets = (presets, activePreset) => {
+      if (Array.isArray(presets) && presets.length) {
+        this.syncedPresets = { presets: presets, activePreset: activePreset };
+        this.setState({ presets: presets, activePreset: activePreset });
+      } else {
+        this.syncedPresets = { presets: this.state.presets, activePreset: this.state.activePreset };
+      }
     };
     if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('page-ready');
   }
@@ -585,6 +598,14 @@ document.addEventListener('DOMContentLoaded', async function() {
       clearTimeout(this.clickSyncTimer);
       this.clickSyncTimer = setTimeout(() => this.syncClicks(), 800);
     }
+    const syncedPresets = this.syncedPresets;
+    if (syncedPresets && window.ReactNativeWebView && (st.presets !== syncedPresets.presets || st.activePreset !== syncedPresets.activePreset)) {
+      this.syncedPresets = { presets: st.presets, activePreset: st.activePreset };
+      clearTimeout(this.presetSyncTimer);
+      this.presetSyncTimer = setTimeout(() => {
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'save-presets', presets: this.state.presets, activePreset: this.state.activePreset }));
+      }, 600);
+    }
     // Every screen shares one scrolling pane, so a new screen would otherwise open
     // wherever the last one was scrolled. Start at the top, or at the card the Ask
     // chat asked to open.
@@ -610,6 +631,8 @@ document.addEventListener('DOMContentLoaded', async function() {
       interests: [st.tag1, st.tag2, st.tag3, st.tag4 || ''].map((t) => t.trim()),
       socials: socials,
       customLinks: st.customLinks,
+      presets: st.presets,
+      activePreset: st.activePreset,
       photo: st.photo.indexOf('data:') === 0 ? st.photo : undefined
     } }));
   }
@@ -824,7 +847,7 @@ let CLICK_DATA = [`
     // Signing out drops the account's clicks and stops syncing before the form is reset.
     patchOnce(
       "if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('sign-out');",
-      "clearTimeout(this.clickSyncTimer); clearTimeout(this.askTimer); this.syncedClicks = null; this.pendingAskId = null; CLICK_DATA = []; if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('sign-out');"
+      "clearTimeout(this.clickSyncTimer); clearTimeout(this.askTimer); clearTimeout(this.presetSyncTimer); this.syncedClicks = null; this.syncedPresets = null; this.pendingAskId = null; CLICK_DATA = []; if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('sign-out');"
     );
     // `coffee` is the launch promo override for the Ask Click premium gate.
     patchOnce(
@@ -905,7 +928,7 @@ let CLICK_DATA = [`
     // Signing out must not leave the previous account's profile in the form.
     patchOnce(
       "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', filter: 'year',",
-      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, shareOpen: false, shareLink: '', shareQr: '', shareTagLink: '', addPreview: null, filter: 'year',"
+      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, shareOpen: false, shareLink: '', shareQr: '', shareTagLink: '', addPreview: null, presets: this.defaultPresets, activePreset: this.defaultActivePreset, filter: 'year',"
     );
     patchOnce(
       'style="align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; color: #7A5E66; font-size: 14px; text-decoration: underline">Sign out (restart demo)</button>',
@@ -969,7 +992,7 @@ let CLICK_DATA = [`
 <div style="position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; justify-content: center; background: rgba(46,15,27,0.42)">
 <div role="dialog" aria-modal="true" aria-label="Share your Click" style="width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 14px; padding: 24px 20px 34px; border-radius: 28px 28px 0 0; background: #FAF7F2">
 <h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: 30px; line-height: 1">Share your Click</h2>
-<p style="margin: 0; font-size: 14px; line-height: 1.45; color: #7A5E66">Anyone who scans this code or opens your link can add you as a click. They'll see your name, photo, bio, interests and socials.</p>
+<p style="margin: 0; font-size: 14px; line-height: 1.45; color: #7A5E66">Anyone who scans this code or opens your link can add you as a click. They'll see your name, photo, bio, interests and the socials in your {{activePresetName}} preset.</p>
 <sc-if value="{{shareLoading}}" hint-placeholder-val="{{false}}"><p style="margin: 0; padding: 48px 0; text-align: center; font-size: 14px; color: #7A5E66">Getting your link…</p></sc-if>
 <sc-if value="{{shareReady}}" hint-placeholder-val="{{false}}"><div style="display: flex; flex-direction: column; gap: 14px">
 <img src="{{shareQr}}" alt="QR code for your share link" style="align-self: center; width: 200px; height: 200px; box-sizing: border-box; padding: 10px; border: 1px solid #E7DFD6; border-radius: 20px; background: #FFFFFF">

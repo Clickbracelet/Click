@@ -43,8 +43,13 @@ type ProfileMessage = {
   interests: string[];
   socials: Record<string, string>;
   customLinks: unknown[];
+  presets: Preset[];
+  activePreset: string;
   photo?: string;
 };
+
+// A Presets tab entry: plats are the ids of the socials and custom links it shares.
+type Preset = { id: string; name: string; plats: string[]; custom: boolean };
 
 // Sent by Frontend.html after a click's note or event is edited, or the click is removed.
 type ClickChange = { id: string; removed?: true; event?: string; note?: string };
@@ -77,6 +82,7 @@ const parseLink = (url: string | null): AppLink | null => {
 
 type PageMessage =
   | { type: 'save-profile'; profile: ProfileMessage }
+  | { type: 'save-presets'; presets: Preset[]; activePreset: string }
   | { type: 'update-clicks'; changes: ClickChange[] }
   | { type: 'add-share-answer'; add: boolean }
   | { type: 'open-url'; url: string }
@@ -120,7 +126,14 @@ export default function App() {
   const loadProfile = async (userId: string): Promise<boolean> => {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
     if (error) throw error;
-    if (!data) return false;
+    // Before the profile exists, the page's presets are saved with it.
+    const setPresets = (presets: unknown, activePreset: unknown) =>
+      page.current?.injectJavaScript(`window.__clickSetPresets && window.__clickSetPresets(${JSON.stringify(presets)}, ${JSON.stringify(activePreset)}); true;`);
+    if (!data) {
+      setPresets(null, null);
+      return false;
+    }
+    setPresets(data.presets, data.active_preset);
     const socials: Record<string, string> = data.socials ?? {};
     const [tag1 = '', tag2 = '', tag3 = '', tag4 = ''] = data.interests ?? [];
     setPageState({
@@ -160,11 +173,25 @@ export default function App() {
       interests: profile.interests,
       socials: profile.socials,
       custom_links: profile.customLinks,
+      presets: profile.presets,
+      active_preset: profile.activePreset,
       updated_at: new Date().toISOString(),
       ...(photoUrl ? { photo_url: photoUrl } : {}),
     });
     if (error) throw error;
     if (photoUrl) setPageState({ photo: photoUrl });
+  };
+
+  // Presets changed on the Presets tab. Only an existing profile is updated: before
+  // the profile is saved, the presets go with it.
+  const savePresets = async (presets: Preset[], activePreset: string) => {
+    const { data: current } = await supabase.auth.getSession();
+    if (!current.session) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({ presets, active_preset: activePreset, updated_at: new Date().toISOString() })
+      .eq('id', current.session.user.id);
+    if (error) throw error;
   };
 
   const loadClicks = async () => {
@@ -409,6 +436,12 @@ export default function App() {
           await saveProfile(parsed.profile);
         } catch (error) {
           showAlert('Could not save your profile', error instanceof Error ? error.message : 'Please try again.');
+        }
+      } else if (parsed.type === 'save-presets') {
+        try {
+          await savePresets(parsed.presets, parsed.activePreset);
+        } catch (error) {
+          showAlert('Could not save your presets', error instanceof Error ? error.message : 'Please try again.');
         }
       } else if (parsed.type === 'update-clicks') {
         try {
