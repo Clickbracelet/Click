@@ -215,6 +215,7 @@ Your Node.js is too old. Install Node 22.13 or newer, then delete `node_modules`
 
 ### Google sign-in fails or returns to the wrong place
 
+- **After picking a Google account, Safari opens a `localhost` page:** Supabase didn't recognize the app's return URL, so it fell back to the project's **Site URL** (by default `http://localhost:3000`). When you tap sign-in, the Expo terminal prints `Google sign-in redirect URL (add to Supabase Redirect URLs): exp://...`. Add that URL, or `exp://**`, under Supabase **Authentication → URL Configuration → Redirect URLs**, then try again. The `exp://` address changes with your computer's IP address and when you use `--tunnel`, which is why `exp://**` is easier.
 - Make sure the Expo Go redirect URLs are allowed in Supabase (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)).
 - Check the `.env` values point to the correct Supabase project.
 - Remember that sign-in is skipped in the web preview. Test it on a phone.

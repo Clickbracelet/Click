@@ -32,6 +32,8 @@ export default function App() {
         }
 
         const redirectTo = Linking.createURL('auth/callback');
+        // Supabase falls back to its Site URL (often localhost) unless this exact URL is allow-listed.
+        if (__DEV__) console.log(`Google sign-in redirect URL (add to Supabase Redirect URLs): ${redirectTo}`);
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: { redirectTo, skipBrowserRedirect: true },
