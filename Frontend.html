@@ -1004,6 +1004,15 @@ let CLICK_DATA = [`
       '<span style="flex: none; min-height: 36px; padding: 0 16px; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 14px; font-weight: 600; display: flex; align-items: center">{{so.action}}</span>',
       '<button type="button" sc-camel-on-click="{{so.open}}" style="flex: none; min-height: 36px; padding: 0 16px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 14px; font-weight: 600; cursor: pointer">{{so.action}}</button>'
     );
+    // Keep a person's socials visually connected as one light-tan account panel.
+    patchOnce(
+      '<p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #7A5E66">Their socials</p>\n<div style="display: flex; flex-direction: column; gap: 10px">',
+      '<p style="margin: 0; font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: #7A5E66">Their socials</p>\n<div style="display: flex; flex-direction: column; gap: 0; overflow: hidden; border: 1px solid #E7DFD6; border-radius: 20px; background: #F5F0E8">'
+    );
+    patchOnce(
+      '<div style="display: flex; align-items: center; gap: 12px; min-height: 64px; box-sizing: border-box; padding: 10px 12px 10px 14px; border: 1px solid #E7DFD6; border-radius: 18px; background: #F5F0E8">',
+      '<div style="display: flex; align-items: center; gap: 12px; min-height: 72px; box-sizing: border-box; padding: 10px 16px; border: 0; border-bottom: 1px solid #E7DFD6; background: transparent">'
+    );
     // The preview photo is a shortcut back to the full-size photo picker.
     patchOnce(
       '<label style="position: relative; display: flex; align-items: center; min-height: 40px; padding: 0 18px; border: 1px solid #E7DFD6; border-radius: 999px; background: #FFFFFF; cursor: pointer; font-size: 14px; font-weight: 600">{{photoLabel}}',
