@@ -268,6 +268,24 @@ export default function App() {
       setPageState({ addPreview: { name: preview.name, description: preview.description ?? '', photo: preview.photo_url ?? '' } });
     });
 
+  // Deletes the avatar files (Storage doesn't allow deleting them with SQL), then the
+  // account and everything stored about it, then the session saved on this device.
+  const deleteAccount = async () => {
+    const { data: current } = await supabase.auth.getSession();
+    if (!current.session) throw new Error('Sign in again, then delete your account.');
+    const userId = current.session.user.id;
+    const { data: files, error: listError } = await supabase.storage.from('avatars').list(userId);
+    if (listError) throw listError;
+    if (files.length) {
+      const { error: removeError } = await supabase.storage.from('avatars').remove(files.map((file) => `${userId}/${file.name}`));
+      if (removeError) throw removeError;
+    }
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) throw error;
+    // The account is gone, so only the local session is left to clear.
+    await supabase.auth.signOut({ scope: 'local' });
+  };
+
   const shareProfile = async () => {
     const { url } = await getShareLinks();
     const message = `Add me on Click: ${url}`;
@@ -486,6 +504,18 @@ export default function App() {
       loadedClickIds.current = new Set();
       const { error } = await supabase.auth.signOut();
       if (error) showAlert('Sign-out failed', error.message);
+    } else if (message === 'delete-account') {
+      try {
+        await deleteAccount();
+        pendingAddAnswer.current?.(false);
+        pendingAddAnswer.current = null;
+        loadedUserId.current = null;
+        loadedClickIds.current = new Set();
+        page.current?.injectJavaScript('window.__clickAccountDeleted && window.__clickAccountDeleted(true); true;');
+      } catch (error) {
+        page.current?.injectJavaScript('window.__clickAccountDeleted && window.__clickAccountDeleted(false); true;');
+        showAlert('Could not delete your account', error instanceof Error ? error.message : 'Please try again.');
+      }
     }
   };
 
