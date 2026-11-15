@@ -533,6 +533,11 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (!answer) { this.answerLocally(); return; }
       this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: answer.text, people: answer.people }]), asking: false });
     };
+    // Opens one click's profile, for links such as an NFC tag.
+    window.__clickOpenClick = (id) => {
+      this.setState({ screen: 'person', selectedId: id, fromSettings: false, editingLoc: false });
+    };
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('page-ready');
   }
 
   // Sends note, event and remove changes to the app once editing pauses.

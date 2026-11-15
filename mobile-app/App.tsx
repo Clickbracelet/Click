@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { Alert, SafeAreaView, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Linking from 'expo-linking';
@@ -34,6 +34,17 @@ type AskMessage = {
 };
 type AskAnswer = { text: string; people: { id: string; reason: string }[] };
 
+// Links that open one click's profile, for example from an NFC tag:
+//   Expo Go:    exp://<computer IP>:8081/--/click/<click id>
+//   App builds: clickbracelet://click/<click id>
+const clickIdFromUrl = (url: string | null) => {
+  if (!url) return null;
+  const { hostname, path } = Linking.parse(url);
+  const route = hostname === 'click' ? `click/${path ?? ''}` : (path ?? '');
+  const match = /^click\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/?$/i.exec(route);
+  return match ? match[1].toLowerCase() : null;
+};
+
 type PageMessage =
   | { type: 'save-profile'; profile: ProfileMessage }
   | { type: 'update-clicks'; changes: ClickChange[] }
@@ -41,6 +52,11 @@ type PageMessage =
 
 export default function App() {
   const webView = useRef<WebView<{}>>(null);
+  const pageReady = useRef(false);
+  // Set once the signed-in user's profile and clicks are loaded into the page.
+  const loadedUserId = useRef<string | null>(null);
+  const loadedClickIds = useRef(new Set<string>());
+  const pendingClickId = useRef<string | null>(null);
 
   const setPageState = (patch: Record<string, unknown>) => {
     webView.current?.injectJavaScript(`window.__clickApp && window.__clickApp.setState(${JSON.stringify(patch)}); true;`);
@@ -107,6 +123,7 @@ export default function App() {
       .select('id, snapshot, location, event, note, clicked_at')
       .order('clicked_at', { ascending: false });
     if (error) throw error;
+    loadedClickIds.current = new Set(data.map((row) => row.id));
     webView.current?.injectJavaScript(`window.__clickSetClicks && window.__clickSetClicks(${JSON.stringify(data)}); true;`);
   };
 
@@ -135,8 +152,10 @@ export default function App() {
   };
 
   const continueAfterSignIn = async (userId: string) => {
+    let loaded = false;
     try {
       await Promise.all([loadProfile(userId), loadClicks()]);
+      loaded = true;
     } catch (error) {
       Alert.alert('Could not load your Click data', error instanceof Error ? error.message : 'Please try again.');
     }
@@ -146,7 +165,43 @@ export default function App() {
         .find((button) => button.textContent?.includes('Continue with Google'))?.click();
       true;
     `);
+    if (loaded) {
+      loadedUserId.current = userId;
+      await openPendingClick();
+    }
   };
+
+  // Opens the click a link asked for once the page is up and the user's clicks are loaded.
+  const openPendingClick = async () => {
+    const id = pendingClickId.current;
+    if (!id || !pageReady.current) return;
+    if (!loadedUserId.current) {
+      // Still signed in from an earlier visit: load their data without the welcome screen.
+      // Otherwise the link waits until they sign in.
+      const { data: current } = await supabase.auth.getSession();
+      if (current.session) await continueAfterSignIn(current.session.user.id);
+      return;
+    }
+    pendingClickId.current = null;
+    if (!loadedClickIds.current.has(id)) {
+      Alert.alert('Click not found', "That click isn't in this account.");
+      return;
+    }
+    webView.current?.injectJavaScript(`window.__clickOpenClick && window.__clickOpenClick(${JSON.stringify(id)}); true;`);
+  };
+
+  // Listens to every incoming link, so tapping the same tag twice opens it again.
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      const id = clickIdFromUrl(url);
+      if (!id) return;
+      pendingClickId.current = id;
+      void openPendingClick();
+    };
+    void Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener('url', (event) => handleUrl(event.url));
+    return () => subscription.remove();
+  }, []);
 
   const handleMessage = async (message: string) => {
     if (message.startsWith('{')) {
@@ -180,7 +235,9 @@ export default function App() {
         if (__DEV__) console.log(`Google sign-in redirect URL (add to Supabase Redirect URLs): ${redirectTo}`);
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
-          options: { redirectTo, skipBrowserRedirect: true },
+          // Always show Google's account picker. Otherwise a phone whose browser is signed in
+          // to one Google account is signed in with it again, even after signing out of Click.
+          options: { redirectTo, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } },
         });
         if (error) throw error;
         if (!data.url) throw new Error('Supabase did not return a Google sign-in URL.');
@@ -200,7 +257,12 @@ export default function App() {
       } catch (error) {
         Alert.alert('Google sign-in failed', error instanceof Error ? error.message : 'Please try again.');
       }
+    } else if (message === 'page-ready') {
+      pageReady.current = true;
+      await openPendingClick();
     } else if (message === 'sign-out') {
+      loadedUserId.current = null;
+      loadedClickIds.current = new Set();
       const { error } = await supabase.auth.signOut();
       if (error) Alert.alert('Sign-out failed', error.message);
     }
