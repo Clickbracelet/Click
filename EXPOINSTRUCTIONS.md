@@ -103,7 +103,16 @@ By default, Expo Go connects straight to your computer over the local network. B
 npx expo start --web
 ```
 
-This opens the app in your browser at `http://localhost:8081`. It works like the phone app: Google sign-in, saving your profile, your clicks, Ask AI and click links (`http://localhost:8081/click/<click id>`) all work. Google sign-in opens in a popup window. If the browser blocks the popup, the sign-in continues in the same tab instead. Web sign-in needs `http://localhost:8081/**` in the Supabase redirect URLs (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)).
+This opens the app in your browser at `http://localhost:8081`. It works like the phone app: Google sign-in, saving your profile, your clicks, Ask AI and click links (`http://localhost:8081/click/<click id>`) all work. Web Google sign-in has been tested and works, including through `--tunnel`.
+
+Google sign-in opens in a popup window. If the browser blocks the popup, the sign-in continues in the same tab instead.
+
+Web sign-in returns to whatever address the page was opened from, so that address must be in the Supabase redirect URLs (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)):
+
+- **`npx expo start --web`:** the page opens at `http://localhost:8081`, covered by `http://localhost:8081/**`.
+- **`npx expo start --web --tunnel`:** if you open the tunnel address (for example `https://c-yourname-….on.expo.app`), it's covered by `https://*.on.expo.app/**`. Older Expo tunnels use `.exp.direct` addresses, covered by `https://*.exp.direct/**`.
+
+To see the exact address, open the browser's developer console and click **Continue with Google**. The app logs `Google sign-in redirect URL (add to Supabase Redirect URLs): …`. The Expo terminal shows the same line.
 
 ---
 
@@ -116,6 +125,7 @@ In the Supabase dashboard, go to **Authentication → URL Configuration → Redi
 - `exp://**` — covers the Expo Go URLs on any computer or network (for example `exp://192.168.1.20:8081/--/auth/callback`).
 - `clickbracelet://auth/callback` — used by native builds of the app.
 - `http://localhost:8081/**` — used by the web preview (`npx expo start --web`).
+- `https://*.on.expo.app/**` — used by the web preview opened through `--tunnel`. Add `https://*.exp.direct/**` too if your Expo version's tunnel uses `.exp.direct` addresses.
 
 This only needs doing once per Supabase project, not once per computer.
 
@@ -220,6 +230,7 @@ Your Node.js is too old. Install Node 22.13 or newer, then delete `node_modules`
 - Make sure the Expo Go redirect URLs are allowed in Supabase (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)).
 - Check the `.env` values point to the correct Supabase project.
 - **On web, sign-in returns to `localhost:3000` or shows a redirect error:** add `http://localhost:8081/**` to the Supabase redirect URLs (see [step 6](#6-maintainers-allow-google-sign-in-from-expo-go)). If you started Expo on a different port, use that port instead.
+- **On web through `--tunnel`, the sign-in popup freezes after you pick a Google account:** the tunnel address isn't allowed, so Supabase sends the popup to the project's default address (`clickbracelet://`), which a browser can't open. Add `https://*.on.expo.app/**` (or `https://*.exp.direct/**` for older tunnels), close the popup, reload the page and try again.
 
 ### The app looks tiny or doesn't fill the screen
 
