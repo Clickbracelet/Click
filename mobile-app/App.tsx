@@ -225,9 +225,16 @@ export default function App() {
     const { data, error } = await supabase.functions.invoke<AskAnswer>('ask-clicks', {
       body: { question, history, localTime },
     });
-    if (error && __DEV__) {
+    if (error) {
       const detail = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
-      console.warn('Ask AI failed, using keyword search instead:', detail?.error ?? error.message);
+      const message =
+        detail && typeof detail === 'object' && 'error' in detail && typeof detail.error === 'string'
+          ? detail.error
+          : error.message;
+      // Release builds used to silently fall back to keyword search here, making
+      // an unavailable Ask service indistinguishable from a real AI response.
+      console.warn('Ask AI failed, using keyword search instead:', message);
+      showAlert('Ask AI is unavailable', message);
     }
     const answer = error ? null : data;
     page.current?.injectJavaScript(
