@@ -48,9 +48,6 @@ export function renderPreview(html, accounts) {
     template = replaceOnce(template, before, after);
   };
 
-  replace('<meta charset="utf-8">', '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">');
-  replace('width: 390px; height: 844px; box-sizing: border-box; background: #FAF7F2;',
-    'width: min(100%, 390px); height: min(100dvh, 844px); margin-inline: auto; box-sizing: border-box; background: #F5F0E8;');
   replace('#C9A14A"></span>Synced</span>', '#C9A14A"></span>Local preview</span>');
   replace('<p style="margin: 0; font-size: 14px; color: #7A5E66">{{countText}}</p>',
     '<p role="status" style="margin: 0; font-size: 14px; color: #7A5E66">{{countText}}</p>');
@@ -137,12 +134,10 @@ class Component extends DCLogic {`.trimStart());
     "braceletStatus: s.braceletInfo ? 'Connected to ' + s.braceletInfo.userId : 'Bracelet disconnected',");
   replace("repair: set({ screen: 'pair', fromSettings: true, pairState: 'idle' }),",
     "repair: set({ screen: 'clicks' }),");
-  const signOut = "signOut: set({ screen: 'welcome', fromSettings: false, pairState: 'idle', filter: 'year', removed: {}, events: {}, notes: {}, expandedId: null, chat: [], chatDraft: '' }),";
-  replace(signOut, `signOut: () => {
+  replace('      signOut: () => {\n', `      signOut: () => {
         if (this.state.braceletBusy) return;
         this.braceletControls.disconnect();
-        ${signOut.slice('signOut: '.length, -1)}();
-      },`);
+`);
 
   const packed = JSON.stringify(template).replace(/<\//g, '<\\u002F');
   const preview = html.replace(bundleTemplate, (_, open, _old, close) => open + packed + close);
