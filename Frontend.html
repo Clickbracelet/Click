@@ -1150,16 +1150,15 @@ let CLICK_DATA = [`
 </sc-if>
 <sc-if value="{{addOpen}}" hint-placeholder-val="{{false}}">
 <div style="position: absolute; inset: 0; z-index: 21; display: flex; align-items: center; justify-content: center; padding: 20px; box-sizing: border-box; background: rgba(46,15,27,0.42)">
-<div role="dialog" aria-modal="true" aria-label="Add {{addName}}" style="width: 100%; max-width: 360px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 20px 20px; border-radius: 28px; background: #FAF7F2; text-align: center">
+<div role="dialog" aria-modal="true" aria-label="{{addName}}" style="width: 100%; max-width: 360px; box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 28px 20px 20px; border-radius: 28px; background: #FAF7F2; text-align: center">
 <span style="width: 88px; height: 88px; flex: none; border-radius: 999px; background: #F5F0E8; overflow: hidden; display: flex; align-items: center; justify-content: center; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 38px; font-weight: 600">
 <sc-if value="{{addHasPhoto}}" hint-placeholder-val="{{false}}"><img src="{{addPhoto}}" alt="" style="width: 100%; height: 100%; object-fit: cover"></sc-if>
 <sc-if value="{{addNoPhoto}}" hint-placeholder-val="{{true}}">{{addInitial}}</sc-if>
 </span>
-<h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: 30px; line-height: 1.05">Add {{addName}}?</h2>
+<h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-weight: 600; font-size: 30px; line-height: 1.05">{{addName}}</h2>
 <sc-if value="{{addHasDesc}}" hint-placeholder-val="{{false}}"><p style="margin: 0; font-size: 14px; line-height: 1.45; color: #4A1A2C">{{addDesc}}</p></sc-if>
 <p style="margin: 0; font-size: 13px; line-height: 1.45; color: #7A5E66">They shared their Click with you. Adding saves their profile to your clicks.</p>
-<button type="button" sc-camel-on-click="{{addAccept}}" style="align-self: stretch; height: 54px; margin-top: 6px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(201,161,74,0.28)">Add to my clicks</button>
-<button type="button" sc-camel-on-click="{{addDecline}}" style="align-self: stretch; height: 54px; border: 1px solid #E7DFD6; border-radius: 999px; background: #FFFFFF; color: #4A1A2C; font-size: 16px; font-weight: 500; cursor: pointer">Not now</button>
+<button type="button" sc-camel-on-click="{{addAccept}}" style="align-self: stretch; height: 54px; margin-top: 6px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(201,161,74,0.28)">You clicked with {{addName}}</button>
 </div>
 </div>
 </sc-if>
