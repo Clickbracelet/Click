@@ -508,6 +508,11 @@ document.addEventListener('DOMContentLoaded', async function() {
       if (template.indexOf(from) === -1) console.error('[click] Supabase sync patch did not apply:', from.slice(0, 80));
       template = template.replace(from, to);
     };
+    // Ask Click includes one complimentary answer before the premium prompt.
+    patchOnce(
+      "chat: [], chatDraft: '', asking: false",
+      "chat: [], chatDraft: '', asking: false, askUses: 0, askPaywall: false, askPremium: false, askPromo: '', askPromoError: false"
+    );
     patchOnce(
       'componentWillUnmount() { clearTimeout(this.pairTimer); clearTimeout(this.askTimer); }',
       `componentDidMount() {
@@ -538,7 +543,8 @@ document.addEventListener('DOMContentLoaded', async function() {
       this.pendingAskId = null;
       clearTimeout(this.askTimer);
       if (!answer) { this.answerLocally(); return; }
-      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: answer.text, people: answer.people }]), asking: false });
+      const usedFreeAsk = !this.state.askPremium && this.state.askUses < 1;
+      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: answer.text, people: answer.people }]), asking: false, askUses: usedFreeAsk ? 1 : this.state.askUses, askPaywall: usedFreeAsk });
     };
     // Opens one click's card in the clicks list, for links such as an NFC tag:
     // the same as tapping a person in the Ask chat.
@@ -625,7 +631,7 @@ const clickFromRow = (r) => {
   return {
     id: r.id, name: shared.name || 'Someone', desc: shared.desc || '', photo: shared.photo || PH[shared.photoKey] || '',
     years: shared.age == null ? null : shared.age, hair: null, loc: r.location || '', event: r.event || '',
-    mins: mins, when: clickWhen(date, mins), about: shared.about || '', socials: shared.socials || []
+    mins: mins, clickedAt: date.getTime(), when: clickWhen(date, mins), about: shared.about || '', socials: shared.socials || []
   };
 };
 let CLICK_DATA = [`
@@ -697,6 +703,25 @@ let CLICK_DATA = [`
     // Audrey is not part of the built-in prototype data. Saved Click records
     // from the signed-in account continue to be supplied separately by Supabase.
     template = template.replace(/\n  \{ id: 'audrey'[\s\S]*?\},\n(?=  \{ id: 'chloe')/, '\n');
+    // Prototype rows get a stable first-seen timestamp. This lets their labels
+    // naturally advance from Today to Yesterday to a calendar date, rather
+    // than being frozen as the copy written into the demo fixture.
+    patchOnce(
+      'const CLICKS = CLICK_DATA;',
+      `const demoClockKey = 'click-demo-clock-v1';
+    let demoClock = Date.now();
+    try {
+      const savedDemoClock = Number(window.localStorage.getItem(demoClockKey));
+      if (Number.isFinite(savedDemoClock) && savedDemoClock > 0) demoClock = savedDemoClock;
+      else window.localStorage.setItem(demoClockKey, String(demoClock));
+    } catch (_) { /* Private browsing can deny storage; the current clock still works. */ }
+    const CLICKS = CLICK_DATA.map((click) => {
+      if (click.clickedAt) return click;
+      const eventTime = demoClock - (click.mins * 60000);
+      const mins = Math.max(0, Math.round((Date.now() - eventTime) / 60000));
+      return Object.assign({}, click, { mins: mins, when: clickWhen(new Date(eventTime), mins) });
+    });`
+    );
     patchOnce('</svg>{{activePresetName}}</button>', '</svg>Preset: {{activePresetName}}</button>');
     // On the Clicks screen, keep switching presets lightweight: the current
     // preset opens a compact picker, while creating one still leads to the
@@ -759,13 +784,18 @@ let CLICK_DATA = [`
       const a = askClick(text, people);
       this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false });
     }, 650);`,
-      `    const people = CLICK_DATA.filter((p) => !this.state.removed[p.id]);
+      `    if (!this.state.askPremium && this.state.askUses >= 1) {
+      this.setState({ askPaywall: true });
+      return;
+    }
+    const people = CLICK_DATA.filter((p) => !this.state.removed[p.id]);
     const history = this.state.chat.map((m) => ({ role: m.from === 'me' ? 'user' : 'assistant', text: m.text }));
     this.setState({ chat: this.state.chat.concat([{ from: 'me', text: text }]), chatDraft: '', asking: true });
     clearTimeout(this.askTimer);
     this.answerLocally = () => {
       const a = askClick(text, people);
-      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false });
+      const usedFreeAsk = !this.state.askPremium && this.state.askUses < 1;
+      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false, askUses: usedFreeAsk ? 1 : this.state.askUses, askPaywall: usedFreeAsk });
     };
     if (!window.ReactNativeWebView || !this.syncedClicks) {
       this.askTimer = setTimeout(this.answerLocally, 650);
@@ -780,6 +810,32 @@ let CLICK_DATA = [`
     patchOnce(
       "if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('sign-out');",
       "clearTimeout(this.clickSyncTimer); clearTimeout(this.askTimer); this.syncedClicks = null; this.pendingAskId = null; CLICK_DATA = []; if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('sign-out');"
+    );
+    // `coffee` is the launch promo override for the Ask Click premium gate.
+    patchOnce(
+      '<sc-if value="{{isAsk}}" hint-placeholder-val="{{true}}">',
+      `<sc-if value="{{askPaywall}}" hint-placeholder-val="{{false}}">
+<div style="position: absolute; inset: 0; z-index: 20; display: flex; align-items: flex-end; padding: 18px; box-sizing: border-box; background: rgba(45, 20, 31, 0.46)">
+  <div role="dialog" aria-modal="true" aria-label="Unlock Ask Click" style="width: 100%; box-sizing: border-box; border-radius: 28px; padding: 26px 22px 22px; background: #FAF7F2; box-shadow: 0 16px 42px rgba(45,20,31,0.28); display: flex; flex-direction: column; gap: 14px">
+    <div style="width: 42px; height: 42px; border-radius: 999px; background: #F1E3BF; display: flex; align-items: center; justify-content: center; color: #4A1A2C; font-size: 21px">✦</div>
+    <div><h2 style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 31px; line-height: 1; color: #4A1A2C">Unlock Ask Click</h2><p style="margin: 8px 0 0; color: #7A5E66; font-size: 14px; line-height: 1.45">You’ve used your complimentary Ask. Get unlimited help remembering the people you click with.</p></div>
+    <button type="button" sc-camel-on-click="{{unlockAskPremium}}" style="height: 50px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 15px; font-weight: 700; cursor: pointer">Unlock Ask Click · $4.99/month</button>
+    <div style="display: flex; align-items: center; gap: 9px; color: #A99A91; font-size: 12px"><span style="height: 1px; flex: 1; background: #E7DFD6"></span>or use a promo code<span style="height: 1px; flex: 1; background: #E7DFD6"></span></div>
+    <div style="display: flex; gap: 8px"><input value="{{askPromo}}" sc-camel-on-change="{{onAskPromo}}" placeholder="Promo code" aria-label="Promo code" style="min-width: 0; flex: 1; height: 46px; box-sizing: border-box; padding: 0 14px; border: 1px solid #D8C9BA; border-radius: 14px; background: #FFFFFF; color: #4A1A2C; font-size: 15px"><button type="button" sc-camel-on-click="{{redeemAskPromo}}" style="height: 46px; padding: 0 16px; border: 1px solid #4A1A2C; border-radius: 14px; background: #FFFFFF; color: #4A1A2C; font-weight: 700; cursor: pointer">Apply</button></div>
+    <sc-if value="{{askPromoError}}" hint-placeholder-val="{{false}}"><p style="margin: -6px 0 0; color: #A44A4A; font-size: 12px">That promo code isn’t valid.</p></sc-if>
+    <button type="button" sc-camel-on-click="{{closeAskPaywall}}" style="border: 0; background: transparent; color: #7A5E66; font-size: 14px; cursor: pointer">Not now</button>
+  </div>
+</div>
+</sc-if>
+<sc-if value="{{isAsk}}" hint-placeholder-val="{{true}}">`
+    );
+    patchOnce(
+      "chat, suggestions, asking: s.asking, showSuggestions: s.chat.length < 3 && !s.asking,\n      chatDraft: s.chatDraft, onChatDraft: (e) => this.setState({ chatDraft: e.target.value }), sendChat: () => this.ask(this.state.chatDraft),",
+      "chat, suggestions, asking: s.asking, showSuggestions: s.chat.length < 3 && !s.asking,\n      chatDraft: s.chatDraft, onChatDraft: (e) => this.setState({ chatDraft: e.target.value }), sendChat: () => this.ask(this.state.chatDraft),\n      askPaywall: !!s.askPaywall, askPromo: s.askPromo, askPromoError: !!s.askPromoError,\n      onAskPromo: (e) => this.setState({ askPromo: e.target.value, askPromoError: false }),\n      closeAskPaywall: () => this.setState({ askPaywall: false, askPromo: '', askPromoError: false }),\n      unlockAskPremium: () => this.setState({ askPremium: true, askPaywall: false, askPromo: '', askPromoError: false }),\n      redeemAskPromo: () => { if ((this.state.askPromo || '').trim().toLowerCase() === 'coffee') { this.setState({ askPremium: true, askPaywall: false, askPromo: '', askPromoError: false }); } else { this.setState({ askPromoError: true }); } },"
+    );
+    patchOnce(
+      "expandedId: null, chat: [], chatDraft: '' })();",
+      "expandedId: null, chat: [], chatDraft: '', askUses: 0, askPaywall: false, askPremium: false, askPromo: '', askPromoError: false })();"
     );
     // Let people choose the framing before saving a compact square avatar.
     // Instagram Follow controls open the selected account in Instagram.
