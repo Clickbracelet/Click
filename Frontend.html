@@ -501,19 +501,64 @@ document.addEventListener('DOMContentLoaded', async function() {
         '<p style="margin: 0; font-size: 14px; font-weight: 500">Add app or website</p><p style="margin: -8px 0 0; font-size: 13px; line-height: 1.45; color: #A99A91">The selected apps will be visible when in {{editModeName}} mode.</p>'
       );
 
-    // Supabase profile sync: the Expo app owns the Supabase client, so the page
-    // posts the profile to it after the profile or socials screen and the app
-    // pushes a saved profile back in through window.__clickApp.
+    // Supabase sync: the Expo app owns the Supabase client, so the page posts the
+    // profile and click edits to it, and the app pushes saved data back in through
+    // window.__clickApp and window.__clickSetClicks.
     const patchOnce = (from, to) => {
-      if (template.indexOf(from) === -1) console.error('[click] profile sync patch did not apply:', from.slice(0, 80));
+      if (template.indexOf(from) === -1) console.error('[click] Supabase sync patch did not apply:', from.slice(0, 80));
       template = template.replace(from, to);
     };
     patchOnce(
       'componentWillUnmount() { clearTimeout(this.pairTimer); clearTimeout(this.askTimer); }',
-      `componentDidMount() { window.__clickApp = this; this.lastScreen = this.state.screen; }
+      `componentDidMount() {
+    window.__clickApp = this;
+    this.lastScreen = this.state.screen;
+    // Swaps the demo clicks for the signed-in user's clicks from Supabase.
+    window.__clickSetClicks = (rows) => {
+      CLICK_DATA = rows.map(clickFromRow);
+      const notes = {};
+      rows.forEach((r) => { if (r.note) notes[r.id] = r.note; });
+      const events = {};
+      const removed = {};
+      this.syncedClicks = { notes: notes, events: events, removed: removed };
+      this.pendingAskId = null;
+      clearTimeout(this.askTimer);
+      this.setState({ notes: notes, events: events, removed: removed, expandedId: null, selectedId: null, chat: [], asking: false });
+    };
+    // The app's reply to an 'ask' message. A null answer means Ask AI was unreachable.
+    window.__clickAnswer = (id, answer) => {
+      if (id !== this.pendingAskId) return;
+      this.pendingAskId = null;
+      clearTimeout(this.askTimer);
+      if (!answer) { this.answerLocally(); return; }
+      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: answer.text, people: answer.people }]), asking: false });
+    };
+  }
+
+  // Sends note, event and remove changes to the app once editing pauses.
+  syncClicks() {
+    const st = this.state;
+    const last = this.syncedClicks;
+    if (!last || !window.ReactNativeWebView) return;
+    const changes = [];
+    CLICK_DATA.forEach((c) => {
+      if (st.removed[c.id] && !last.removed[c.id]) { changes.push({ id: c.id, removed: true }); return; }
+      const change = {};
+      if (st.events[c.id] !== undefined && st.events[c.id] !== last.events[c.id]) change.event = st.events[c.id];
+      if ((st.notes[c.id] || '') !== (last.notes[c.id] || '')) change.note = st.notes[c.id] || '';
+      if (Object.keys(change).length) changes.push(Object.assign({ id: c.id }, change));
+    });
+    this.syncedClicks = { notes: st.notes, events: st.events, removed: st.removed };
+    if (changes.length) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'update-clicks', changes: changes }));
+  }
 
   componentDidUpdate() {
     const st = this.state;
+    const synced = this.syncedClicks;
+    if (synced && (st.notes !== synced.notes || st.events !== synced.events || st.removed !== synced.removed)) {
+      clearTimeout(this.clickSyncTimer);
+      this.clickSyncTimer = setTimeout(() => this.syncClicks(), 800);
+    }
     const prev = this.lastScreen;
     this.lastScreen = st.screen;
     if (prev === st.screen || (prev !== 'profile' && prev !== 'socials') || !window.ReactNativeWebView) return;
@@ -529,7 +574,72 @@ document.addEventListener('DOMContentLoaded', async function() {
     } }));
   }
 
-  componentWillUnmount() { clearTimeout(this.pairTimer); clearTimeout(this.askTimer); }`
+  componentWillUnmount() { clearTimeout(this.pairTimer); clearTimeout(this.askTimer); clearTimeout(this.clickSyncTimer); }`
+    );
+    // Turns a Supabase clicks row into the shape the clicks list, person screen and Ask expect.
+    // Hair is left out on purpose: Ask should only use what people shared about themselves.
+    patchOnce(
+      'const CLICK_DATA = [',
+      `const clickWhen = (date, mins) => {
+  if (mins < 60) return Math.max(1, mins) + (mins <= 1 ? ' minute ago' : ' minutes ago');
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const time = date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (date.getTime() >= startOfToday) return 'Today, ' + time;
+  if (date.getTime() >= startOfToday - 86400000) return 'Yesterday, ' + time;
+  if (mins < 10080) return Math.round(mins / 1440) + ' days ago';
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+const clickFromRow = (r) => {
+  const shared = r.snapshot || {};
+  const date = new Date(r.clicked_at);
+  const mins = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
+  return {
+    id: r.id, name: shared.name || 'Someone', desc: shared.desc || '', photo: shared.photo || PH[shared.photoKey] || '',
+    years: shared.age == null ? null : shared.age, hair: null, loc: r.location || '', event: r.event || '',
+    mins: mins, when: clickWhen(date, mins), about: shared.about || '', socials: shared.socials || []
+  };
+};
+let CLICK_DATA = [`
+    );
+    // A new account can have no clicks, so the person screen needs something to fall back to.
+    patchOnce(
+      'const sel = CLICKS.find((c) => c.id === s.selectedId) || CLICKS[0];',
+      "const sel = CLICKS.find((c) => c.id === s.selectedId) || CLICKS[0] || { id: '', name: '', desc: '', loc: '', event: '', when: '', socials: [] };"
+    );
+    patchOnce("'Who has red hair?', ", "'Who did I meet at the AI Hackathon?', ");
+    patchOnce('I can find people by age, hair color in their photo, where or when you met', 'I can find people by age, where or when you met');
+    // Ask AI: once signed in with real clicks, questions go to the app, which asks
+    // the ask-clicks function. The keyword search stays as the offline fallback.
+    patchOnce(
+      `    const people = CLICK_DATA.filter((p) => !this.state.removed[p.id]);
+    this.setState({ chat: this.state.chat.concat([{ from: 'me', text: text }]), chatDraft: '', asking: true });
+    clearTimeout(this.askTimer);
+    this.askTimer = setTimeout(() => {
+      const a = askClick(text, people);
+      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false });
+    }, 650);`,
+      `    const people = CLICK_DATA.filter((p) => !this.state.removed[p.id]);
+    const history = this.state.chat.map((m) => ({ role: m.from === 'me' ? 'user' : 'assistant', text: m.text }));
+    this.setState({ chat: this.state.chat.concat([{ from: 'me', text: text }]), chatDraft: '', asking: true });
+    clearTimeout(this.askTimer);
+    this.answerLocally = () => {
+      const a = askClick(text, people);
+      this.setState({ chat: this.state.chat.concat([{ from: 'bot', text: a.text, people: a.people }]), asking: false });
+    };
+    if (!window.ReactNativeWebView || !this.syncedClicks) {
+      this.askTimer = setTimeout(this.answerLocally, 650);
+      return;
+    }
+    const askId = 'ask' + Date.now();
+    this.pendingAskId = askId;
+    this.askTimer = setTimeout(() => window.__clickAnswer(askId, null), 30000);
+    window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ask', id: askId, question: text, history: history, localTime: new Date().toString() }));`
+    );
+    // Signing out drops the account's clicks and stops syncing before the form is reset.
+    patchOnce(
+      "if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('sign-out');",
+      "clearTimeout(this.clickSyncTimer); clearTimeout(this.askTimer); this.syncedClicks = null; this.pendingAskId = null; CLICK_DATA = []; if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage('sign-out');"
     );
     // Shrink the photo to a small JPEG data URL so it can be handed to the app and uploaded.
     patchOnce(
@@ -552,7 +662,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Signing out must not leave the previous account's profile in the form.
     patchOnce(
       "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', filter: 'year',",
-      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, filter: 'year',"
+      "set({ screen: 'welcome', fromSettings: false, pairState: 'idle', photo: '', profName: '', tag1: '', tag2: '', tag3: '', tag4: '', profBio: '', on: {}, handles: {}, customLinks: [], profileIdentityError: false, socialError: false, asking: false, filter: 'year',"
     );
     patchOnce(
       'style="align-self: center; min-height: 44px; padding: 0 16px; border: 0; background: transparent; cursor: pointer; color: #7A5E66; font-size: 14px; text-decoration: underline">Sign out (restart demo)</button>',

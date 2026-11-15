@@ -6,7 +6,11 @@ Turn the **Ask** tab into an AI assistant that answers questions about the signe
 
 ## Current state
 
-The Ask tab does not use AI yet. `askClick()` in the prototype matches keywords and regular expressions (age, hair, "today", interests) against `CLICK_DATA`, a hardcoded list of 12 made-up people. Supabase does not store any clicks yet. The only table is `profiles`.
+Phase 3 is done. In the app, once signed in with real clicks, the Ask tab sends each question and the chat so far to `App.tsx`, which calls `ask-clicks` and passes the answer back into the chat. If the call fails, or no answer arrives within 30 seconds, the page answers with the old keyword search, `askClick()`. Dev builds log the reason in the Expo terminal. The web preview and signed-out sessions always use the keyword search.
+
+Phase 1 is done. Clicks live in the Supabase `clicks` table, and after sign-in the app replaces the demo `CLICK_DATA` with the user's own clicks. Note and event edits and removed clicks are saved back. Dev builds call `seed_demo_clicks()` on sign-in, which gives an account with no clicks the 12 prototype demo clicks. The hair-from-photo field was dropped from real clicks.
+
+Phase 2 is done. The `ask-clicks` Edge Function (`supabase/functions/ask-clicks/index.ts`) is deployed. It needs the `ANTHROPIC_API_KEY` secret set in Supabase before it can answer (Dashboard → Edge Functions → Secrets). It takes `{ question, history?: { role: 'user' | 'assistant', text }[], localTime? }` and returns `{ text, people: { id, reason }[] }`, or `{ error }` with a non-200 status. It logs each question's token usage to the function logs.
 
 ## Key idea: look up the data on every question
 
@@ -24,6 +28,7 @@ The model keeps nothing between requests. Each user only ever gets answers from 
   - `id`, and `owner_id`: the user who has the click.
   - `other_user_id`: the other person, if they are on Click.
   - `snapshot` (jsonb): the name, description, about text and socials that person shared through their preset at the moment of the click.
+  - `person_name`: the other person's name, generated from `snapshot` so it shows as its own column in the dashboard.
   - `location`, `event`, `clicked_at` and `note`.
 - **Access rule:** each user can only see clicks where `owner_id` is their own user ID, the same pattern as `profiles`. A snapshot means the AI only sees what the other person actually chose to share.
 - **App change:** replace `CLICK_DATA` with clicks loaded from Supabase after sign-in, the same way the profile is loaded now. Until the bracelet hardware exists, add a few test rows so Ask has something to search.
@@ -36,7 +41,7 @@ The model keeps nothing between requests. Each user only ever gets answers from 
   1. Read the caller's sign-in token and create a Supabase client that acts as that user. The access rules then limit it to their clicks automatically. Do not use the admin (service role) key here.
   2. Load their clicks and format them compactly.
   3. Call Claude with fixed instructions (what Click is, answer only from the clicks provided, say so when nothing matches), then the clicks, then the question.
-  4. Use structured output so the answer comes back as `{ text, personIds[] }`. The Ask screen already shows a reply plus tappable person cards, so the AI fits into the current UI as is.
+  4. Use structured output so the answer comes back as `{ text, people: { id, reason }[] }`. The Ask screen already shows a reply plus tappable person cards with a reason, so the AI fits into the current UI as is.
 - **Model:** Claude Opus 5.5 (`claude-opus-5-5`) at `low` effort, which suits chat and keeps replies quick. Turn on Anthropic's built-in fallback setting, which automatically retries a declined request on a fallback model. Claude Haiku 5.5 (`claude-haiku-5-5`) is the cheaper option to test before launch (see **Cost**).
 - **Caching:** put the instructions and the click list first and turn on prompt caching. Follow-up questions in the same chat then reuse that text at a fraction of the cost.
 

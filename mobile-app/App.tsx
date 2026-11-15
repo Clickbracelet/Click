@@ -4,6 +4,7 @@ import { Alert, SafeAreaView, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from './src/supabase';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -19,6 +20,24 @@ type ProfileMessage = {
   customLinks: unknown[];
   photo?: string;
 };
+
+// Sent by Frontend.html after a click's note or event is edited, or the click is removed.
+type ClickChange = { id: string; removed?: true; event?: string; note?: string };
+
+// Sent by Frontend.html's Ask tab. The answer is the ask-clicks function's reply.
+type AskMessage = {
+  type: 'ask';
+  id: string;
+  question: string;
+  history: { role: 'user' | 'assistant'; text: string }[];
+  localTime: string;
+};
+type AskAnswer = { text: string; people: { id: string; reason: string }[] };
+
+type PageMessage =
+  | { type: 'save-profile'; profile: ProfileMessage }
+  | { type: 'update-clicks'; changes: ClickChange[] }
+  | AskMessage;
 
 export default function App() {
   const webView = useRef<WebView<{}>>(null);
@@ -76,11 +95,50 @@ export default function App() {
     if (photoUrl) setPageState({ photo: photoUrl });
   };
 
+  const loadClicks = async () => {
+    // Until the bracelet exists, dev builds give each account the prototype's demo clicks.
+    if (__DEV__) {
+      const { error: seedError } = await supabase.rpc('seed_demo_clicks');
+      if (seedError) throw seedError;
+    }
+    // Access rules limit this to the signed-in user's own clicks.
+    const { data, error } = await supabase
+      .from('clicks')
+      .select('id, snapshot, location, event, note, clicked_at')
+      .order('clicked_at', { ascending: false });
+    if (error) throw error;
+    webView.current?.injectJavaScript(`window.__clickSetClicks && window.__clickSetClicks(${JSON.stringify(data)}); true;`);
+  };
+
+  const updateClicks = async (changes: ClickChange[]) => {
+    for (const { id, removed, ...fields } of changes) {
+      const { error } = removed
+        ? await supabase.from('clicks').delete().eq('id', id)
+        : await supabase.from('clicks').update(fields).eq('id', id);
+      if (error) throw error;
+    }
+  };
+
+  // Sends null when Ask AI can't answer, so the page falls back to its keyword search.
+  const askClicks = async ({ id, question, history, localTime }: AskMessage) => {
+    const { data, error } = await supabase.functions.invoke<AskAnswer>('ask-clicks', {
+      body: { question, history, localTime },
+    });
+    if (error && __DEV__) {
+      const detail = error instanceof FunctionsHttpError ? await error.context.json().catch(() => null) : null;
+      console.warn('Ask AI failed, using keyword search instead:', detail?.error ?? error.message);
+    }
+    const answer = error ? null : data;
+    webView.current?.injectJavaScript(
+      `window.__clickAnswer && window.__clickAnswer(${JSON.stringify(id)}, ${JSON.stringify(answer)}); true;`,
+    );
+  };
+
   const continueAfterSignIn = async (userId: string) => {
     try {
-      await loadProfile(userId);
+      await Promise.all([loadProfile(userId), loadClicks()]);
     } catch (error) {
-      Alert.alert('Could not load your profile', error instanceof Error ? error.message : 'Please try again.');
+      Alert.alert('Could not load your Click data', error instanceof Error ? error.message : 'Please try again.');
     }
     webView.current?.injectJavaScript(`
       window.__clickGoogleAuthed = true;
@@ -92,13 +150,21 @@ export default function App() {
 
   const handleMessage = async (message: string) => {
     if (message.startsWith('{')) {
-      const parsed = JSON.parse(message) as { type: string; profile: ProfileMessage };
+      const parsed = JSON.parse(message) as PageMessage;
       if (parsed.type === 'save-profile') {
         try {
           await saveProfile(parsed.profile);
         } catch (error) {
           Alert.alert('Could not save your profile', error instanceof Error ? error.message : 'Please try again.');
         }
+      } else if (parsed.type === 'update-clicks') {
+        try {
+          await updateClicks(parsed.changes);
+        } catch (error) {
+          Alert.alert('Could not save your click changes', error instanceof Error ? error.message : 'Please try again.');
+        }
+      } else if (parsed.type === 'ask') {
+        await askClicks(parsed);
       }
     } else if (message === 'google-sign-in') {
       try {
