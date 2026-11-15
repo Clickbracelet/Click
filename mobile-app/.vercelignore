@@ -1,0 +1,6 @@
+# Vercel builds from source with its own environment variables.
+.env
+.env.*
+.expo
+dist
+node_modules
