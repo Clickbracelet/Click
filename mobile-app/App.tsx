@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
-import { Alert, Platform, SafeAreaView, Share, StyleSheet } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Platform, SafeAreaView, Share, StyleSheet, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import { FunctionsHttpError } from '@supabase/supabase-js';
@@ -126,6 +126,10 @@ export default function App() {
   const pendingAddAnswer = useRef<((add: boolean) => void) | null>(null);
   // True once a share link opened the app for someone who isn't signed in.
   const guestMode = useRef(false);
+  // Covers the page while a share link opens, so the sign-in screen doesn't flash first.
+  const [openingLink, setOpeningLink] = useState(
+    () => Platform.OS === 'web' && /\/add\//.test(window.location.pathname),
+  );
 
   const setPageState = (patch: Record<string, unknown>) => {
     page.current?.injectJavaScript(`window.__clickApp && window.__clickApp.setState(${JSON.stringify(patch)}); true;`);
@@ -408,6 +412,14 @@ export default function App() {
 
   // Acts on the link that opened the app once the page is up and the user's clicks are loaded.
   const openPendingLink = async () => {
+    try {
+      await actOnPendingLink();
+    } finally {
+      if (pageReady.current) setOpeningLink(false);
+    }
+  };
+
+  const actOnPendingLink = async () => {
     if ((!pendingClickId.current && !pendingShareCode.current) || !pageReady.current) return;
     if (!loadedUserId.current) {
       // Still signed in from an earlier visit: load their data without the welcome screen.
@@ -432,6 +444,9 @@ export default function App() {
       try {
         const clickId = await addFromShare(code);
         if (clickId) pendingClickId.current = clickId;
+        // So refreshing the page doesn't ask to add the same person again. Guests keep the
+        // link, so a refresh shows the same card.
+        if (Platform.OS === 'web') window.history.replaceState(null, '', '/');
       } catch (error) {
         showAlert('Could not add this person', error instanceof Error ? error.message : 'Please try again.');
       }
@@ -483,8 +498,7 @@ export default function App() {
       if (!link) return;
       if (link.kind === 'click') pendingClickId.current = link.id;
       else pendingShareCode.current = link.code;
-      // So refreshing the page doesn't ask to add the same person again.
-      if (Platform.OS === 'web' && link.kind === 'add') window.history.replaceState(null, '', '/');
+      if (link.kind === 'add') setOpeningLink(true);
       void openPendingLink();
     };
     void Linking.getInitialURL().then(handleUrl);
@@ -616,11 +630,25 @@ export default function App() {
     }
   };
 
+  // Never leave the cover up if something goes wrong while a link opens.
+  useEffect(() => {
+    if (!openingLink) return;
+    const timer = setTimeout(() => setOpeningLink(false), 10000);
+    return () => clearTimeout(timer);
+  }, [openingLink]);
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <OpenInAppBar />
-      <ClickPage ref={page} html={html} onMessage={(message) => void handleMessage(message)} />
+      <View style={styles.page}>
+        <ClickPage ref={page} html={html} onMessage={(message) => void handleMessage(message)} />
+        {openingLink && (
+          <View style={styles.opening}>
+            <ActivityIndicator color="#C9A14A" />
+          </View>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -629,5 +657,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FAF7F2',
+  },
+  page: {
+    flex: 1,
+  },
+  opening: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F0E8',
   },
 });
