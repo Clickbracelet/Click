@@ -99,6 +99,14 @@ const shareLinks = (code: string) => ({
 });
 
 // The page can't load a QR library from the internet, so the app draws the code.
+// Guest mode: a share link opened by someone who isn't signed in (for example a phone
+// tapping a Click bracelet) shows the sharer's card and the app without an account.
+// Share codes listed here are added to every guest's clicks after the sharer, so the
+// app isn't empty. Get a code from the end of that person's share link.
+const GUEST_FEATURED_CODES: string[] = [];
+// Where a guest's click with the sharer says they met. Change it for each event.
+const GUEST_LOCATION = 'EconAlliance Future Forum';
+
 const qrDataUrl = (text: string) => {
   const qr = qrcode(0, 'M');
   qr.addData(text);
@@ -118,6 +126,8 @@ export default function App() {
   const pendingShareCode = useRef<string | null>(null);
   // Answers the page's "Add this person?" card.
   const pendingAddAnswer = useRef<((add: boolean) => void) | null>(null);
+  // True once a share link opened the app for someone who isn't signed in.
+  const guestMode = useRef(false);
 
   const setPageState = (patch: Record<string, unknown>) => {
     page.current?.injectJavaScript(`window.__clickApp && window.__clickApp.setState(${JSON.stringify(patch)}); true;`);
@@ -222,6 +232,12 @@ export default function App() {
 
   // Sends null when Ask AI can't answer, so the page falls back to its keyword search.
   const askClicks = async ({ id, question, history, localTime }: AskMessage) => {
+    // Ask AI needs an account. Guests get the page's own search over their clicks.
+    const { data: current } = await supabase.auth.getSession();
+    if (!current.session) {
+      page.current?.injectJavaScript(`window.__clickAnswer && window.__clickAnswer(${JSON.stringify(id)}, null); true;`);
+      return;
+    }
     const { data, error } = await supabase.functions.invoke<AskAnswer>('ask-clicks', {
       body: { question, history, localTime },
     });
@@ -359,6 +375,38 @@ export default function App() {
     return clickId as string;
   };
 
+  // A share link opened without signing in: show the sharer's card, then the app with
+  // their click (and any featured clicks). Nothing is saved to Supabase.
+  const openAsGuest = async (code: string) => {
+    const card = async (shareCode: string) => {
+      const { data, error } = await supabase.rpc('get_public_card', { code: shareCode });
+      if (error) throw error;
+      return data as Record<string, unknown> | null;
+    };
+    const sharer = await card(code);
+    if (!sharer) {
+      showAlert('Link not valid', 'That share link is no longer valid. Ask them to send a new one.');
+      return;
+    }
+    const featured = await Promise.all(
+      GUEST_FEATURED_CODES.filter((c) => c !== code).map((c) => card(c).catch(() => null)),
+    );
+    const now = Date.now();
+    const rows = [sharer, ...featured]
+      .filter((snapshot): snapshot is Record<string, unknown> => !!snapshot)
+      .map((snapshot, i) => ({
+        id: `guest-${i}`,
+        snapshot,
+        location: i === 0 ? GUEST_LOCATION : '',
+        event: '',
+        note: null,
+        // The sharer is "just now"; featured clicks sit a little earlier.
+        clicked_at: new Date(now - i * 3600000).toISOString(),
+      }));
+    guestMode.current = true;
+    page.current?.injectJavaScript(`window.__clickGuest && window.__clickGuest(${JSON.stringify(rows)}); true;`);
+  };
+
   // Acts on the link that opened the app once the page is up and the user's clicks are loaded.
   const openPendingLink = async () => {
     if ((!pendingClickId.current && !pendingShareCode.current) || !pageReady.current) return;
@@ -366,7 +414,17 @@ export default function App() {
       // Still signed in from an earlier visit: load their data without the welcome screen.
       // Otherwise the link waits until they sign in.
       const { data: current } = await supabase.auth.getSession();
-      if (current.session) await continueAfterSignIn(current.session.user.id);
+      if (current.session) {
+        await continueAfterSignIn(current.session.user.id);
+      } else if (pendingShareCode.current && !guestMode.current) {
+        const code = pendingShareCode.current;
+        pendingShareCode.current = null;
+        try {
+          await openAsGuest(code);
+        } catch (error) {
+          showAlert('Could not open this Click', error instanceof Error ? error.message : 'Please try again.');
+        }
+      }
       return;
     }
     const code = pendingShareCode.current;

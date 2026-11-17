@@ -560,6 +560,17 @@ document.addEventListener('DOMContentLoaded', async function() {
       this.scrollToExpandedClick = true;
       this.setState({ screen: 'clicks', filter: 'year', expandedId: id, noteOpenId: null, editingLoc: false });
     };
+    // Guest mode (App.tsx openAsGuest): a share link was opened without an account, for
+    // example by a phone tapping a Click bracelet. The guest's clicks are the sharer (and
+    // any featured clicks), kept on this phone only, and the sharer's card pops up first,
+    // the same card as adding someone.
+    window.__clickGuest = (rows) => {
+      CLICK_DATA = rows.map(clickFromRow);
+      const sharer = CLICK_DATA[0];
+      this.guestClickId = sharer ? sharer.id : null;
+      this.setState({ screen: 'clicks', fromSettings: false, filter: 'year', notes: {}, events: {}, removed: {}, expandedId: null, selectedId: null, chat: [], asking: false,
+        addPreview: sharer ? { name: sharer.name, description: sharer.desc, photo: sharer.photo } : null });
+    };
     // The app's reply to 'delete-account'. Once deleted, the page resets like signing out.
     window.__clickAccountDeleted = (deleted) => {
       if (!deleted) { this.setState({ deleting: false }); return; }
@@ -1090,7 +1101,7 @@ let CLICK_DATA = [`
       addDesc: (s.addPreview && s.addPreview.description) || '', addHasDesc: !!(s.addPreview && s.addPreview.description),
       addPhoto: (s.addPreview && s.addPreview.photo) || '', addHasPhoto: !!(s.addPreview && s.addPreview.photo), addNoPhoto: !(s.addPreview && s.addPreview.photo),
       addInitial: ((s.addPreview && s.addPreview.name) || '?').trim().charAt(0).toUpperCase() || '?',
-      addAccept: () => { this.setState({ addPreview: null }); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'add-share-answer', add: true })); },
+      addAccept: () => { this.setState({ addPreview: null }); if (this.guestClickId) { const id = this.guestClickId; this.guestClickId = null; window.__clickOpenClick(id); return; } if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'add-share-answer', add: true })); },
       addDecline: () => { this.setState({ addPreview: null }); if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'add-share-answer', add: false })); },
       deleteOpen: !!s.deleteOpen, deleting: !!s.deleting, notDeleting: !s.deleting,
       openDelete: set({ deleteOpen: true, deleting: false }),
