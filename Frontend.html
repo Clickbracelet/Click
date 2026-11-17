@@ -568,6 +568,7 @@ document.addEventListener('DOMContentLoaded', async function() {
       CLICK_DATA = rows.map(clickFromRow);
       const sharer = CLICK_DATA[0];
       this.guestClickId = sharer ? sharer.id : null;
+      this.isGuest = true;
       this.setState({ screen: 'clicks', fromSettings: false, filter: 'year', notes: {}, events: {}, removed: {}, expandedId: null, selectedId: null, chat: [], asking: false,
         addPreview: sharer ? { name: sharer.name, description: sharer.desc, photo: sharer.photo } : null });
     };
@@ -1020,7 +1021,7 @@ let CLICK_DATA = [`
     // Instagram Follow controls open the selected account in Instagram.
     patchOnce(
       "const socRow = (so) => ({ plat: so.plat, handle: so.handle, action: so.action, badge: so.key === 'sp' ? 'Sp' : so.key,",
-      "const socialUrl = (so) => { const handle = (so.handle || '').trim(); if (so.key === 'ig') { const username = handle.replace(/^@/, ''); return username ? 'https://www.instagram.com/' + encodeURIComponent(username) + '/' : ''; } if (so.key === 'web') return handle ? (/^https:\\/\\//i.test(handle) ? handle : 'https://' + handle) : ''; return ''; };\n    const openSocial = (so) => { const url = socialUrl(so); if (!url) return; if (window.ReactNativeWebView) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'open-url', url: url })); } else { window.open(url, '_blank', 'noopener,noreferrer'); } };\n    const socRow = (so) => ({ plat: so.plat, handle: so.handle, action: so.action, badge: so.key === 'sp' ? 'Sp' : so.key, open: () => openSocial(so),"
+      "const socialUrl = (so) => { const handle = (so.handle || '').trim(); if (!handle) return ''; const hasUrl = handle.indexOf('://') !== -1; const isLink = hasUrl || handle.indexOf('/') !== -1 || /^www[.]/i.test(handle); const link = hasUrl ? handle : 'https://' + handle; if (isLink) return link; if (so.key === 'web' || so.key === 'other') return handle.indexOf('.') !== -1 ? link : ''; const user = encodeURIComponent(handle.replace(/^@/, '')); const byKey = { ig: 'https://www.instagram.com/' + user + '/', tt: 'https://www.tiktok.com/@' + user, sc: 'https://www.snapchat.com/add/' + user, li: 'https://www.linkedin.com/in/' + user + '/', x: 'https://x.com/' + user, fb: 'https://www.facebook.com/' + user, yt: 'https://www.youtube.com/@' + user, th: 'https://www.threads.net/@' + user, pin: 'https://www.pinterest.com/' + user + '/', sp: 'https://open.spotify.com/user/' + user }; return byKey[so.key] || ''; };\n    const openSocial = (so) => { const url = socialUrl(so); if (!url) return; if (window.ReactNativeWebView) { window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'open-url', url: url })); } else { window.open(url, '_blank', 'noopener,noreferrer'); } };\n    const socRow = (so) => ({ plat: so.plat, handle: so.handle, action: so.action, badge: so.key === 'sp' ? 'Sp' : so.key, open: () => openSocial(so),"
     );
     patchOnce('socials: sel.socials', 'socials: sel.socials.map(socRow)');
     patchOnce(
@@ -1175,6 +1176,16 @@ let CLICK_DATA = [`
 </sc-if>
 <sc-if value="{{showTabs}}" hint-placeholder-val="{{false}}">
 <nav aria-label="Main"`
+    );
+
+    // Guest mode: an expanded card offers the Click waitlist to people without an account.
+    patchOnce(
+      "toggleNote: () => this.setState({ noteOpenId: noteOpen ? '__closed__' : c.id }),",
+      "toggleNote: () => this.setState({ noteOpenId: noteOpen ? '__closed__' : c.id }),\n        guestWaitlist: open && !!this.isGuest,\n        joinWaitlist: () => { const url = 'https://clickbracelet.com/?waitlist=1&src=nfc'; if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'open-url', url: url })); else window.open(url, '_blank', 'noopener,noreferrer'); },"
+    );
+    patchOnce(
+      '<div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px">\n<button type="button" sc-camel-on-click="{{c.toggleNote}}"',
+      '<sc-if value="{{c.guestWaitlist}}" hint-placeholder-val="{{false}}">\n<button type="button" sc-camel-on-click="{{c.joinWaitlist}}" style="display: block; width: 100%; box-sizing: border-box; height: 54px; margin-top: 12px; border: 0; border-radius: 999px; background: linear-gradient(90deg, #E0C27F, #C9A14A 50%, #C38A6C); color: #4A1A2C; font-size: 16px; font-weight: 600; cursor: pointer; box-shadow: 0 8px 20px rgba(201,161,74,0.28)">Join the Click waitlist</button>\n</sc-if>\n<div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px">\n<button type="button" sc-camel-on-click="{{c.toggleNote}}"'
     );
 
     // Nested page bundles (iframe targets). Each ships ONCE, in the ROOT

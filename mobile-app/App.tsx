@@ -101,9 +101,7 @@ const shareLinks = (code: string) => ({
 // The page can't load a QR library from the internet, so the app draws the code.
 // Guest mode: a share link opened by someone who isn't signed in (for example a phone
 // tapping a Click bracelet) shows the sharer's card and the app without an account.
-// Share codes listed here are added to every guest's clicks after the sharer, so the
-// app isn't empty. Get a code from the end of that person's share link.
-const GUEST_FEATURED_CODES: string[] = [];
+// Featured cards (get_guest_featured_cards in Supabase) follow the sharer's, so the app isn't empty.
 // Where a guest's click with the sharer says they met. Change it for each event.
 const GUEST_LOCATION = 'EconAlliance Future Forum';
 
@@ -388,9 +386,10 @@ export default function App() {
       showAlert('Link not valid', 'That share link is no longer valid. Ask them to send a new one.');
       return;
     }
-    const featured = await Promise.all(
-      GUEST_FEATURED_CODES.filter((c) => c !== code).map((c) => card(c).catch(() => null)),
-    );
+    // Cards every guest sees beside the sharer's (Sabine's saved card). A failure here
+    // still shows the sharer's card.
+    const { data: featuredData } = await supabase.rpc('get_guest_featured_cards');
+    const featured = (Array.isArray(featuredData) ? featuredData : []) as Record<string, unknown>[];
     const now = Date.now();
     const rows = [sharer, ...featured]
       .filter((snapshot): snapshot is Record<string, unknown> => !!snapshot)
