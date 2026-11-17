@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { createClient } from '@supabase/supabase-js';
 
 type PublicSocial = {
   platform_name: string;
@@ -22,70 +21,41 @@ type PublicCardData = {
 };
 
 const WAITLIST_URL = 'https://clickbracelet.com/?waitlist=1&src=nfc';
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const LOCAL_PREVIEW_CARD: PublicCardData = {
-  display_name: 'Sample Click',
+const PUBLIC_CARDS: Record<string, PublicCardData> = {
+  '8PfX05P4HA': {
+  display_name: 'Audrey Guinn Stephenson',
   photo_url: null,
-  bio: 'This is a local-only example of a public Click card.',
-  interests: ['Design', 'Music', 'Outdoors'],
+  bio: 'Founded Click. Electro-pop musician who writes, sings, and produces her own music. Startup founder, marketing, entrepreneur.',
+  interests: ['Click founder', 'Electro-pop musician', 'Business', 'Cal Poly'],
   current_preset_name: 'Networking',
   socials: [
-    { platform_name: 'LinkedIn', handle: 'linkedin.com/in/sample', action_label: 'Connect', open_type: 'link', profile_url: 'https://www.linkedin.com/in/sample', copy_value: null, copy_note: null },
+    { platform_name: 'Instagram', handle: '@audreyguinn', action_label: 'Follow', open_type: 'link', profile_url: 'https://www.instagram.com/audreyguinn/', copy_value: null, copy_note: null },
+    { platform_name: 'LinkedIn', handle: 'Audrey Guinn Stephenson', action_label: 'Connect', open_type: 'lookup', profile_url: 'https://www.linkedin.com/search/results/people/?keywords=Audrey%20Guinn%20Stephenson', copy_value: null, copy_note: null },
     { platform_name: 'Website', handle: 'clickbracelet.com', action_label: 'Visit', open_type: 'link', profile_url: 'https://clickbracelet.com', copy_value: null, copy_note: null },
   ],
+  },
 };
 
 export default function PublicCard({ shareToken }: { shareToken: string }) {
   const [card, setCard] = useState<PublicCardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const localPreview = __DEV__ && typeof window !== 'undefined'
-    && new URLSearchParams(window.location.search).get('preview') === '1';
 
   useEffect(() => {
     let active = true;
 
     async function loadCard() {
-      if (localPreview) {
-        setCard(LOCAL_PREVIEW_CARD);
+      const row = PUBLIC_CARDS[shareToken];
+      if (active) {
+        if (!row) setMessage('This Click is no longer available.');
+        else setCard(row);
         setLoading(false);
-        return;
-      }
-      if (!SUPABASE_URL || !SUPABASE_KEY) {
-        if (active) {
-          setMessage('This Click is temporarily unavailable.');
-          setLoading(false);
-        }
-        return;
-      }
-
-      try {
-        const client = createClient(SUPABASE_URL, SUPABASE_KEY, {
-          auth: { persistSession: false, autoRefreshToken: false },
-        });
-        const { data, error } = await client.rpc('get_public_click_card', {
-          p_share_token: shareToken,
-        });
-        if (error) throw error;
-
-        const row = Array.isArray(data) ? data[0] : data;
-        if (active) {
-          if (!row) setMessage('This Click is no longer available.');
-          else setCard(row as PublicCardData);
-          setLoading(false);
-        }
-      } catch {
-        if (active) {
-          setMessage('This Click is temporarily unavailable.');
-          setLoading(false);
-        }
       }
     }
 
     void loadCard();
     return () => { active = false; };
-  }, [shareToken, localPreview]);
+  }, [shareToken]);
 
   const openWaitlist = () => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
@@ -124,7 +94,6 @@ export default function PublicCard({ shareToken }: { shareToken: string }) {
       <View style={styles.page}>
         <View style={styles.statusCard}>
           <Text style={styles.brand}>CLICK</Text>
-          {localPreview && <Text style={styles.previewLabel}>LOCAL PREVIEW SAMPLE</Text>}
           <Text style={styles.status}>{loading ? 'Opening your Click…' : message}</Text>
           {!loading && <Text style={styles.statusHint}>Ask the person who shared this link for an updated Click.</Text>}
         </View>
