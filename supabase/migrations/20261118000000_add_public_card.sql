@@ -3,7 +3,7 @@
 -- and only with a valid share code. It returns the same public card a click saves
 -- (name, interests, bio, photo, socials, custom links) and never the email, notes,
 -- presets or anyone's clicks. Codes are 10 random characters, so they can't be guessed.
-create function public.get_public_card(code text)
+create or replace function public.get_public_card(code text)
 returns jsonb
 language sql
 stable
@@ -22,7 +22,7 @@ grant execute on function public.get_public_card(text) to anon, authenticated;
 -- Chung's card exactly as it is saved in Audrey's clicks (photo, socials and all), so no
 -- extra share link is needed. Only the public card snapshot is returned: no notes,
 -- locations or anything else from Audrey's account.
-create function public.get_guest_featured_cards()
+create or replace function public.get_guest_featured_cards()
 returns jsonb
 language sql
 stable
